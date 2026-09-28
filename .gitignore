@@ -1,0 +1,27 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Packaging
+build/
+dist/
+*.egg-info/
+
+# Virtual Environments
+.venv/
+
+# SQLite & agdb cassettes
+*.agdb
+*.agdb-wal
+*.agdb-shm
+
+# Pytest & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editor
+.vscode/
+.idea/
+.DS_Store
