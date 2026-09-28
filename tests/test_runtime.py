@@ -1,17 +1,17 @@
-"""Tests for agdb runtime interceptor and breakpoints."""
+"""Tests for unloop runtime interceptor and breakpoints."""
 
 import tempfile
 from pathlib import Path
 import pytest
-import agdb
-from agdb.runtime.interceptor import BreakpointHalt
+import unloop
+from unloop.runtime.interceptor import BreakpointHalt
 
 
 def test_session_tracing_and_breakpoints():
     with tempfile.TemporaryDirectory() as tmpdir:
-        db_path = Path(tmpdir) / "test.agdb"
+        db_path = Path(tmpdir) / "test.unloop"
 
-        with agdb.session("test_agent", db_path=db_path, raise_on_breakpoint=True) as dbg:
+        with unloop.session("test_agent", db_path=db_path, raise_on_breakpoint=True) as dbg:
             # Add breakpoint on error
             dbg.add_breakpoint(on_error=True)
 
@@ -28,7 +28,7 @@ def test_session_tracing_and_breakpoints():
             assert "Tool error encountered" in str(exc_info.value)
 
         # Reopen store and verify persistence
-        store = agdb.AgdbStore(db_path)
+        store = unloop.UnloopStore(db_path)
         history = store.get_history(dbg.session_id, "main")
         assert len(history) == 2
         assert history[0].is_breakpoint is False
@@ -39,9 +39,9 @@ def test_session_tracing_and_breakpoints():
 
 def test_session_rewind_and_branch_forking():
     with tempfile.TemporaryDirectory() as tmpdir:
-        db_path = Path(tmpdir) / "rewind.agdb"
+        db_path = Path(tmpdir) / "rewind.unloop"
 
-        with agdb.session("branch_agent", db_path=db_path) as dbg:
+        with unloop.session("branch_agent", db_path=db_path) as dbg:
             # Turn 0
             with dbg.step(prompt="Init", state={"turn": 0}) as step:
                 step.set_response("Started")
@@ -61,7 +61,7 @@ def test_session_rewind_and_branch_forking():
             with dbg.step(prompt="Correct direction", state={"turn": 1, "path": "fixed"}) as step:
                 step.set_response("Fixed way")
 
-        store = agdb.AgdbStore(db_path)
+        store = unloop.UnloopStore(db_path)
         branches = store.get_branches(dbg.session_id)
         assert len(branches) == 2
         recov_history = store.get_history(dbg.session_id, "recovery_branch")

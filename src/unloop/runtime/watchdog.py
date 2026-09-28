@@ -10,7 +10,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Deque, List, Optional
 
-from agdb.protocol.models import ToolInvocationRecord, TurnSnapshot
+from unloop.protocol.models import ToolInvocationRecord, TurnSnapshot
 
 
 @dataclass

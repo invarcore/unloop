@@ -1,12 +1,12 @@
-"""Demonstration of agdb with a native Python agent loop.
+"""Demonstration of unloop with a native Python agent loop.
 
 Simulates an agent that gets stuck in a repetitive critique loop,
-triggers the agdb anti-oscillation watchdog, rewinds to a previous turn,
+triggers the unloop anti-oscillation watchdog, rewinds to a previous turn,
 mutates state, and completes execution successfully on a recovery branch.
 """
 
 import sys
-import agdb
+import unloop
 
 if sys.stdout.encoding.lower() != "utf-8":
     try:
@@ -23,10 +23,10 @@ def mock_tool_call(tool_name: str, query: str):
 
 
 def run_agent_demonstration():
-    print("=== Starting agdb Native Loop Demonstration ===")
-    db_file = "demo_agent.agdb"
+    print("=== Starting unloop Native Loop Demonstration ===")
+    db_file = "demo_agent.unloop"
 
-    with agdb.session("research_assistant", db_path=db_file) as dbg:
+    with unloop.session("research_assistant", db_path=db_file) as dbg:
         # Breakpoint on error or watchdog alerts
         dbg.add_breakpoint(on_error=True)
 
@@ -82,8 +82,8 @@ def run_agent_demonstration():
         print(f"\n[SUCCESS] Agent successfully completed on branch '{dbg.active_branch}'")
         print(f"Final state: {memory}")
 
-    print(f"\n[TRACE SAVED] Inspect session with: agdb info {db_file}")
-    print(f"              Inspect history with: agdb history {db_file}")
+    print(f"\n[TRACE SAVED] Inspect session with: unloop info {db_file}")
+    print(f"              Inspect history with: unloop history {db_file}")
 
 
 if __name__ == "__main__":

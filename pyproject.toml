@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agdb"
+name = "unloop"
 version = "0.1.0"
-description = "Agent GNU Debugger - Terminal time-travel stepper, anti-oscillation watchdog, and state mutation engine for AI agents"
+description = "The Time-Travel Debugger for AI Agents — Break out of critique loops, rewind cognitive turns, and mutate state in-flight"
 readme = "README.md"
 authors = [
     { name = "Vinay Kumar Ksheera Sagar", email = "sagarv.kumar48@gmail.com" }
@@ -41,7 +41,7 @@ dev = [
 ]
 
 [project.scripts]
-agdb = "agdb.cli.main:cli"
+unloop = "unloop.cli.main:cli"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/agdb"]
+packages = ["src/unloop"]

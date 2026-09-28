@@ -1,31 +1,31 @@
-"""agdb: Agent GNU Debugger.
+"""unloop: The Time-Travel Debugger for AI Agents.
 
-Terminal time-travel stepper, anti-oscillation watchdog, and state mutation engine for AI agents.
+Break out of critique loops, rewind cognitive turns, and mutate state in-flight.
 """
 
-from agdb.protocol.models import (
+from unloop.protocol.models import (
     SessionMetadata,
     TokenTelemetry,
     ToolInvocationRecord,
     TurnSnapshot,
 )
-from agdb.runtime.breakpoints import Breakpoint, BreakpointManager
-from agdb.runtime.interceptor import AgdbSession, BreakpointHalt, TurnContext
-from agdb.runtime.watchdog import OscillationAlert, OscillationWatchdog
-from agdb.storage.db import AgdbStore
+from unloop.runtime.breakpoints import Breakpoint, BreakpointManager
+from unloop.runtime.interceptor import UnloopSession, AgdbSession, BreakpointHalt, TurnContext
+from unloop.runtime.watchdog import OscillationAlert, OscillationWatchdog
+from unloop.storage.db import UnloopStore, AgdbStore
 
 __version__ = "0.1.0"
 
 
 def session(
     name: str = "agent_run",
-    db_path: str = "session.agdb",
+    db_path: str = "session.unloop",
     framework: str = "custom",
     interactive: bool = False,
     raise_on_breakpoint: bool = False,
-) -> AgdbSession:
-    """Convenience constructor for an agdb debugging session."""
-    return AgdbSession(
+) -> UnloopSession:
+    """Convenience constructor for an unloop debugging session."""
+    return UnloopSession(
         name=name,
         db_path=db_path,
         framework=framework,
@@ -47,6 +47,8 @@ __all__ = [
     "ToolInvocationRecord",
     "TurnContext",
     "TurnSnapshot",
+    "UnloopSession",
+    "UnloopStore",
     "__version__",
     "session",
 ]

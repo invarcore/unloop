@@ -1,6 +1,6 @@
-"""Tests for agdb protocol models."""
+"""Tests for unloop protocol models."""
 
-from agdb.protocol.models import SessionMetadata, ToolInvocationRecord, TurnSnapshot
+from unloop.protocol.models import SessionMetadata, ToolInvocationRecord, TurnSnapshot
 
 
 def test_tool_invocation_argument_hash():

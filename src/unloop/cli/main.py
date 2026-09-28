@@ -1,4 +1,4 @@
-"""Command line interface for agdb."""
+"""Command line interface for unloop."""
 
 from __future__ import annotations
 
@@ -10,23 +10,23 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from agdb.storage.db import AgdbStore
+from unloop.storage.db import UnloopStore
 
 console = Console()
 
 
 @click.group()
-@click.version_option(package_name="agdb")
+@click.version_option(package_name="unloop")
 def cli():
-    """agdb: Agent GNU Debugger - Terminal time-travel stepper and post-mortem inspector."""
+    """unloop: Agent GNU Debugger - Terminal time-travel stepper and post-mortem inspector."""
     pass
 
 
 @cli.command("info")
 @click.argument("db_path", type=click.Path(exists=True, dir_okay=False))
 def info(db_path: str):
-    """Display metadata, branches, and status summary of an agdb session file."""
-    with AgdbStore(db_path) as store:
+    """Display metadata, branches, and status summary of an unloop session file."""
+    with UnloopStore(db_path) as store:
         cursor = store.conn.cursor()
         sessions = cursor.execute(
             "SELECT session_id, name, created_at, framework, active_branch FROM sessions ORDER BY created_at DESC"
@@ -68,7 +68,7 @@ def info(db_path: str):
 @click.option("--branch", default=None, help="Branch name to inspect (defaults to session active branch).")
 def history(db_path: str, session_id: Optional[str], branch: Optional[str]):
     """List execution turns with tool calls and state deltas."""
-    with AgdbStore(db_path) as store:
+    with UnloopStore(db_path) as store:
         cursor = store.conn.cursor()
         if session_id:
             row = cursor.execute("SELECT session_id, active_branch FROM sessions WHERE session_id = ?", (session_id,)).fetchone()
@@ -90,7 +90,7 @@ def history(db_path: str, session_id: Optional[str], branch: Optional[str]):
         console.print(f"[bold cyan]Execution Timeline (Session: {active_sess_id[:8]}..., Branch: {target_branch}, Turns: {len(turns)})[/bold cyan]\n")
 
         for t in turns:
-            bp_tag = f" [bold red]🛑 {t.breakpoint_reason}[/bold red]" if t.is_breakpoint else ""
+            bp_tag = f" [bold red]ðŸ›‘ {t.breakpoint_reason}[/bold red]" if t.is_breakpoint else ""
             panel_title = f"Turn #{t.turn_index} (ID: {t.turn_id[:8]}){bp_tag}"
 
             content = []
@@ -103,7 +103,7 @@ def history(db_path: str, session_id: Optional[str], branch: Optional[str]):
                 content.append("\n[bold yellow]Tool Invocations:[/bold yellow]")
                 for tool in t.tool_invocations:
                     status = "[red]FAILED[/red]" if tool.error else "[green]OK[/green]"
-                    content.append(f"  • {tool.tool_name} {status} (args: {json.dumps(tool.arguments)})")
+                    content.append(f"  â€¢ {tool.tool_name} {status} (args: {json.dumps(tool.arguments)})")
                     if tool.error:
                         content.append(f"    [red]Error: {tool.error}[/red]")
 
@@ -119,8 +119,8 @@ def history(db_path: str, session_id: Optional[str], branch: Optional[str]):
 @click.option("--session-id", default=None, help="Specific session ID to export.")
 @click.option("--output", "-o", type=click.Path(), default="incident_report.md", help="Output file path.")
 def export_report(db_path: str, session_id: Optional[str], output: str):
-    """Export an agdb session into a comprehensive Markdown post-mortem incident report."""
-    with AgdbStore(db_path) as store:
+    """Export an unloop session into a comprehensive Markdown post-mortem incident report."""
+    with UnloopStore(db_path) as store:
         cursor = store.conn.cursor()
         if session_id:
             row = cursor.execute("SELECT session_id, name, framework, active_branch FROM sessions WHERE session_id = ?", (session_id,)).fetchone()
@@ -135,7 +135,7 @@ def export_report(db_path: str, session_id: Optional[str], output: str):
         turns = store.get_history(active_sess_id, branch_id=active_branch or "main")
 
         md = [
-            f"# agdb Post-Mortem Incident Report: {name}",
+            f"# unloop Post-Mortem Incident Report: {name}",
             f"- **Session ID**: `{active_sess_id}`",
             f"- **Framework**: `{framework}`",
             f"- **Branch**: `{active_branch}`",
@@ -149,7 +149,7 @@ def export_report(db_path: str, session_id: Optional[str], output: str):
         for t in turns:
             md.append(f"### Turn #{t.turn_index} (`{t.turn_id[:8]}`)")
             if t.is_breakpoint:
-                md.append(f"> ⚠️ **Breakpoint Tripped**: {t.breakpoint_reason}")
+                md.append(f"> âš ï¸ **Breakpoint Tripped**: {t.breakpoint_reason}")
                 md.append("")
             if t.prompt:
                 md.append(f"**Prompt**: {t.prompt}")
@@ -170,6 +170,6 @@ def export_report(db_path: str, session_id: Optional[str], output: str):
 @cli.command("replay")
 @click.argument("db_path", type=click.Path(exists=True, dir_okay=False))
 def replay(db_path: str):
-    """Launch the interactive terminal TUI to inspect and step through an agdb session."""
-    from agdb.tui.app import run_tui
+    """Launch the interactive terminal TUI to inspect and step through an unloop session."""
+    from unloop.tui.app import run_tui
     run_tui(db_path)

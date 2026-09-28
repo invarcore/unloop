@@ -1,15 +1,15 @@
-"""Tests for agdb SQLite WAL storage engine."""
+"""Tests for unloop SQLite WAL storage engine."""
 
 import tempfile
 from pathlib import Path
-from agdb.protocol.models import SessionMetadata, TurnSnapshot, ToolInvocationRecord
-from agdb.storage.db import AgdbStore
+from unloop.protocol.models import SessionMetadata, TurnSnapshot, ToolInvocationRecord
+from unloop.storage.db import UnloopStore
 
 
 def test_storage_crud_and_branching():
     with tempfile.TemporaryDirectory() as tmpdir:
-        db_path = Path(tmpdir) / "test_session.agdb"
-        store = AgdbStore(db_path)
+        db_path = Path(tmpdir) / "test_session.unloop"
+        store = UnloopStore(db_path)
 
         meta = SessionMetadata(name="test_run", framework="langgraph")
         store.create_session(meta)

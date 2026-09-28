@@ -1,18 +1,18 @@
-"""Tests for agdb CLI commands."""
+"""Tests for unloop CLI commands."""
 
 import tempfile
 from pathlib import Path
 from click.testing import CliRunner
-import agdb
-from agdb.cli.main import cli
+import unloop
+from unloop.cli.main import cli
 
 
 def test_cli_info_history_and_export():
     with tempfile.TemporaryDirectory() as tmpdir:
-        db_path = Path(tmpdir) / "cli_test.agdb"
+        db_path = Path(tmpdir) / "cli_test.unloop"
         report_path = Path(tmpdir) / "report.md"
 
-        with agdb.session("cli_session", db_path=db_path) as dbg:
+        with unloop.session("cli_session", db_path=db_path) as dbg:
             with dbg.step(prompt="CLI Test prompt", state={"score": 100}) as step:
                 step.record_tool("check_status", arguments={"env": "prod"}, result="healthy")
                 step.set_response("System all clear")

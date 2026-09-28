@@ -1,4 +1,4 @@
-"""Interactive Textual TUI for agdb."""
+"""Interactive Textual TUI for unloop."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.widgets import Button, Footer, Header, Label, ListItem, ListView, Static
 
-from agdb.protocol.models import TurnSnapshot
-from agdb.storage.db import AgdbStore
+from unloop.protocol.models import TurnSnapshot
+from unloop.storage.db import UnloopStore
 
 
 class TurnItem(ListItem):
@@ -28,7 +28,7 @@ class TurnItem(ListItem):
         return Text(f"{bp}Turn #{self.turn.turn_index} [{self.turn.turn_id[:6]}]{tools}")
 
 
-class AgdbTuiApp(App):
+class UnloopTuiApp(App):
     """3-Pane Textual Application for time-travel agent inspection and rewind."""
 
     CSS = """
@@ -66,7 +66,7 @@ class AgdbTuiApp(App):
     def __init__(self, db_path: str | Path, **kwargs):
         super().__init__(**kwargs)
         self.db_path = Path(db_path)
-        self.store = AgdbStore(self.db_path)
+        self.store = UnloopStore(self.db_path)
         self.turns: list[TurnSnapshot] = []
         self.selected_turn: Optional[TurnSnapshot] = None
 
@@ -84,7 +84,7 @@ class AgdbTuiApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.title = f"agdb: {self.db_path.name}"
+        self.title = f"unloop: {self.db_path.name}"
         cursor = self.store.conn.cursor()
         row = cursor.execute("SELECT session_id, active_branch FROM sessions LIMIT 1").fetchone()
         if row:
@@ -119,7 +119,7 @@ class AgdbTuiApp(App):
         if turn.tool_invocations:
             content.append("\n[bold yellow]Tool Invocations:[/bold yellow]")
             for tool in turn.tool_invocations:
-                content.append(f"  � {tool.tool_name} (args: {json.dumps(tool.arguments)})")
+                content.append(f"  ï¿½ {tool.tool_name} (args: {json.dumps(tool.arguments)})")
                 if tool.result is not None:
                     content.append(f"    -> Result: {json.dumps(tool.result)}")
                 if tool.error:
@@ -135,5 +135,8 @@ class AgdbTuiApp(App):
 
 def run_tui(db_path: str | Path):
     """Launch the interactive TUI."""
-    app = AgdbTuiApp(db_path)
+    app = UnloopTuiApp(db_path)
     app.run()
+
+
+AgdbTuiApp = UnloopTuiApp

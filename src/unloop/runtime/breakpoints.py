@@ -1,11 +1,11 @@
-"""Breakpoint manager and condition evaluator for agdb."""
+"""Breakpoint manager and condition evaluator for unloop."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
-from agdb.protocol.models import TurnSnapshot
+from unloop.protocol.models import TurnSnapshot
 
 
 @dataclass

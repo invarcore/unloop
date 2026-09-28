@@ -1,6 +1,6 @@
-"""agdb protocol package."""
+"""unloop protocol package."""
 
-from agdb.protocol.models import (
+from unloop.protocol.models import (
     SessionMetadata,
     TokenTelemetry,
     ToolInvocationRecord,

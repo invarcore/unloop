@@ -1,4 +1,4 @@
-"""Execution interceptor and tracing context manager for agdb."""
+"""Execution interceptor and tracing context manager for unloop."""
 
 from __future__ import annotations
 
@@ -8,22 +8,22 @@ import uuid
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from agdb.protocol.models import (
+from unloop.protocol.models import (
     SessionMetadata,
     TokenTelemetry,
     ToolInvocationRecord,
     TurnSnapshot,
 )
-from agdb.runtime.breakpoints import BreakpointManager
-from agdb.runtime.watchdog import OscillationAlert, OscillationWatchdog
-from agdb.storage.db import AgdbStore
+from unloop.runtime.breakpoints import BreakpointManager
+from unloop.runtime.watchdog import OscillationAlert, OscillationWatchdog
+from unloop.storage.db import UnloopStore
 
 
 class BreakpointHalt(Exception):
     """Raised when an execution breakpoint halts execution in headless CI mode."""
 
     def __init__(self, reason: str, turn: TurnSnapshot):
-        super().__init__(f"Execution halted by agdb breakpoint: {reason}")
+        super().__init__(f"Execution halted by unloop breakpoint: {reason}")
         self.reason = reason
         self.turn = turn
 
@@ -33,7 +33,7 @@ class TurnContext:
 
     def __init__(
         self,
-        session: AgdbSession,
+        session: UnloopSession,
         prompt: Optional[str] = None,
         state: Optional[Dict[str, Any]] = None,
         messages: Optional[List[Dict[str, Any]]] = None,
@@ -100,20 +100,20 @@ class TurnContext:
         self.session._finalize_turn(self.snapshot)
 
 
-class AgdbSession:
+class UnloopSession:
     """Manages an active agent debugging session with recording and breakpoint controls."""
 
     def __init__(
         self,
         name: str = "agent_run",
-        db_path: str | Path = "session.agdb",
+        db_path: str | Path = "session.unloop",
         framework: str = "custom",
         model_name: Optional[str] = None,
         interactive: bool = False,
         raise_on_breakpoint: bool = False,
     ):
         self.db_path = Path(db_path)
-        self.store = AgdbStore(self.db_path)
+        self.store = UnloopStore(self.db_path)
         self.metadata = SessionMetadata(
             name=name,
             framework=framework,
@@ -224,8 +224,12 @@ class AgdbSession:
         """Close SQLite session."""
         self.store.close()
 
-    def __enter__(self) -> "AgdbSession":
+    def __enter__(self) -> "UnloopSession":
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self.close()
+
+
+# Backwards compatibility alias
+AgdbSession = UnloopSession

@@ -1,4 +1,4 @@
-"""High-performance SQLite WAL storage engine for agdb."""
+"""High-performance SQLite WAL storage engine for unloop."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from agdb.protocol.models import (
+from unloop.protocol.models import (
     SessionMetadata,
     TokenTelemetry,
     ToolInvocationRecord,
@@ -15,7 +15,7 @@ from agdb.protocol.models import (
 )
 
 
-class AgdbStore:
+class UnloopStore:
     """Manages append-only SQLite WAL persistence for agent turns, sessions, and branches."""
 
     def __init__(self, db_path: str | Path):
@@ -241,8 +241,12 @@ class AgdbStore:
         """Close database connection."""
         self.conn.close()
 
-    def __enter__(self) -> "AgdbStore":
+    def __enter__(self) -> "UnloopStore":
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self.close()
+
+
+# Backwards compatibility alias
+AgdbStore = UnloopStore

@@ -1,4 +1,4 @@
-"""Canonical protocol models for agdb (Agent GNU Debugger).
+"""Canonical protocol models for unloop (Agent GNU Debugger).
 
 These models define the framework-agnostic TurnSnapshot, StateDelta,
 and ToolInvocation contracts used for time-travel debugging.
@@ -101,7 +101,7 @@ class TurnSnapshot(BaseModel):
 
 
 class SessionMetadata(BaseModel):
-    """Metadata describing an agdb recording session."""
+    """Metadata describing an unloop recording session."""
 
     session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = "agent_run"

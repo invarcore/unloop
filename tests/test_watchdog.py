@@ -1,7 +1,7 @@
 """Tests for anti-oscillation watchdog."""
 
-from agdb.protocol.models import ToolInvocationRecord, TurnSnapshot
-from agdb.runtime.watchdog import OscillationWatchdog
+from unloop.protocol.models import ToolInvocationRecord, TurnSnapshot
+from unloop.runtime.watchdog import OscillationWatchdog
 
 
 def test_watchdog_detects_repetitive_tool():
