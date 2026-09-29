@@ -75,10 +75,31 @@ claude mcp add unloop-proxy -- "unloop-mcp"
 ### 3. Python Agent Loop SDK
 Instrument your custom agent loops, **LangGraph**, or **CrewAI** pipelines with minimal Python code:
 
+#### Option A: Zero-Boilerplate `@unloop.trace` Decorator
+Wrap agent turn functions directly (supports both sync and async):
+
 ```python
 import unloop
 
-# Wrap your agent loop with an unloop session
+# Automatically records prompt, memory deltas, durations, and returned reasoning
+@unloop.trace()
+def run_agent_turn(prompt: str, state: dict) -> str:
+    response = call_llm(prompt, state)
+    state["last_thought"] = response
+    return response
+
+# Or asynchronously:
+@unloop.trace()
+async def async_agent_turn(prompt: str, state: dict) -> dict:
+    return await execute_agent_pipeline(prompt, state)
+```
+
+#### Option B: Context Manager with Breakpoints & Rewind
+Use fine-grained control for complex multi-tool loops:
+
+```python
+import unloop
+
 with unloop.session("research_assistant", db_path="run.unloop") as dbg:
     # Set breakpoints on tool errors or specific dangerous tools
     dbg.add_breakpoint(on_error=True)
@@ -86,16 +107,16 @@ with unloop.session("research_assistant", db_path="run.unloop") as dbg:
 
     for turn_idx in range(10):
         with dbg.step(prompt="Analyze research report", state=agent.memory) as step:
-            # 1. Run LLM reasoning
             action, args = agent.decide()
             step.set_response(f"Decided to invoke {action}")
 
-            # 2. Execute & trace tool call
             result = run_tool(action, args)
             step.record_tool(action, arguments=args, result=result)
-
-            # 3. Update agent state
             agent.memory["last_action"] = action
+
+        # Time-travel rewind to prior turn if stuck
+        if dbg.current_turn_id and agent.is_stuck():
+            dbg.rewind_to(checkpoint_turn_id, new_branch_name="recovery")
 ```
 
 ---
@@ -105,9 +126,13 @@ Run headless agent benchmarks, automated PR bots, and evaluations with zero over
 
 ```yaml
 # In your GitHub Actions workflow
-- name: Run Autonomous Fixer Agent
+- name: Run Autonomous Fixer Agent (Headless Flight Recording)
   run: |
-    unloop record --output-cassette ./failure.unloop -- claude "fix vuln-1049"
+    unloop record -o ./failure.unloop -- python run_agent.py "fix vuln-1049"
+
+- name: Enforce Agent Quality Gate (Fail on loops, errors, or token blowups)
+  run: |
+    unloop check ./failure.unloop --max-turns 15 --no-oscillations --no-errors
 ```
 
 When a CI agent fails:
@@ -120,22 +145,19 @@ When a CI agent fails:
 ## 🖥️ Terminal TUI Interface
 
 ```text
-┌── Execution Timeline DAG ──────┐┌── Turn Inspector & State Delta ───────────────────┐
-│                                ││                                                   │
-│ [main]                         ││ Turn ID:  a1a7ee52                                │
-│ ├── Turn #0 [a1a7ee]           ││ Branch:   recovery_fix | Index: #1                │
-│ ├── Turn #1 [f2c901] 🔴 LOOP   ││                                                   │
-│ └── [recovery_fix]             ││ Prompt:                                           │
-│    └── Turn #1 [e1fd91] 🟢 DONE ││   Resume with fixed query                         │
-│                                ││                                                   │
-│                                ││ Tool Invocations:                                 │
-│                                ││   ✓ web_search OK (query: "corrected_query")      │
-│                                ││                                                   │
-│                                ││ State Delta:                                      │
-│                                ││   modified: query: "broken_query" -> "corrected"  │
-│                                ││             status: "in_progress" -> "completed"  │
-└────────────────────────────────┘└───────────────────────────────────────────────────┘
-[s] Next Turn  │  [u] Prev / Rewind  │  [m] Mutate State  │  [f] Fork  │  [q] Quit
+┌── Execution Timeline DAG ──┐┌── Turn Inspector ───────────────┐┌── State Delta & Memory ─────┐
+│                            ││                                 ││                             │
+│ [main]                     ││ Turn ID:  a1a7ee52              ││ State Delta (vs Parent):    │
+│ ├── Turn #0 [a1a7ee]       ││ Branch:   recovery_fix          ││  query: "broken" -> "fixed" │
+│ ├── Turn #1 [f2c901] [!]   ││ Turn Index: #1                  ││  status: "init" -> "active" │
+│ └── [recovery_fix]         ││                                 ││                             │
+│    └── Turn #1 [e1fd91] OK ││ Prompt: Resume with fixed query ││ Current Memory State:       │
+│                            ││ Response: Query resolved.       ││  {                          │
+│                            ││                                 ││    "query": "fixed",        │
+│                            ││ Tool Invocations:               ││    "status": "completed"    │
+│                            ││   * web_search OK               ││  }                          │
+└────────────────────────────┘└─────────────────────────────────┘└─────────────────────────────┘
+Keys: [s] Next Turn | [u] Prev Turn | [f] Fork Branch | [m] Mutate State | [q] Quit
 ```
 
 ---
@@ -153,7 +175,16 @@ uv tool install unloop
 ### CLI Commands
 
 ```bash
-# Display summary of recorded session
+# Headless flight recording runner (CI or local scripts)
+unloop record -o run.unloop -- python agent.py
+
+# CI Quality Gate assertion (assert loop-freedom, max turns, and zero tool errors)
+unloop check run.unloop --max-turns 12 --no-oscillations --no-errors
+
+# Side-by-side state and tool execution diff between two turns
+unloop diff run.unloop --from 0 --to 1
+
+# Display summary of recorded session metadata, tokens, and branches
 unloop info run.unloop
 
 # Inspect full turn execution timeline with colorized state diffs
@@ -230,14 +261,16 @@ git clone https://github.com/sagarv48/unloop.git
 cd unloop
 
 # Install with development dependencies using uv
-uv venv --python 3.14
-uv pip install -e ".[dev]"
+uv sync --all-extras
+
+# Run linter
+uv run ruff check .
 
 # Run comprehensive test suite
-pytest -v
+uv run pytest -v
 
 # Run interactive loop recovery demonstration
-python examples/01_native_loop_agent.py
+uv run python examples/01_native_loop_agent.py
 ```
 
 ---

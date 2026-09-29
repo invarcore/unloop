@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
-from typing import Deque, List, Optional
 
 from unloop.protocol.models import ToolInvocationRecord, TurnSnapshot
 
@@ -19,8 +18,8 @@ class OscillationAlert:
 
     alert_type: str  # "REPETITIVE_TOOL", "PING_PONG_OSCILLATION", "STATE_CYCLE"
     message: str
-    tool_name: Optional[str] = None
-    argument_hash: Optional[str] = None
+    tool_name: str | None = None
+    argument_hash: str | None = None
     frequency: int = 0
 
 
@@ -32,15 +31,15 @@ class OscillationWatchdog:
         max_consecutive_tools: int = 3,
         window_size: int = 8,
         detect_state_cycles: bool = True,
-    ):
+    ) -> None:
         self.max_consecutive_tools = max_consecutive_tools
         self.window_size = window_size
         self.detect_state_cycles = detect_state_cycles
 
-        self._tool_history: Deque[tuple[str, str]] = deque(maxlen=window_size)  # (tool_name, arg_hash)
-        self._state_hashes: Deque[str] = deque(maxlen=window_size)
+        self._tool_history: deque[tuple[str, str]] = deque(maxlen=window_size)  # (tool_name, arg_hash)
+        self._state_hashes: deque[str] = deque(maxlen=window_size)
 
-    def record_turn(self, turn: TurnSnapshot) -> Optional[OscillationAlert]:
+    def record_turn(self, turn: TurnSnapshot) -> OscillationAlert | None:
         """Record a turn and check for loop patterns. Returns OscillationAlert if triggered."""
         # 1. Check state cycle
         if self.detect_state_cycles and turn.state:
@@ -62,7 +61,7 @@ class OscillationWatchdog:
 
         return None
 
-    def record_tool_call(self, tool: ToolInvocationRecord) -> Optional[OscillationAlert]:
+    def record_tool_call(self, tool: ToolInvocationRecord) -> OscillationAlert | None:
         """Check a single tool call for repetitive execution or ping-pong patterns."""
         entry = (tool.tool_name, tool.argument_hash)
         self._tool_history.append(entry)

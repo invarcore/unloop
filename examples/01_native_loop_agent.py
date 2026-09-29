@@ -6,6 +6,7 @@ mutates state, and completes execution successfully on a recovery branch.
 """
 
 import sys
+
 import unloop
 
 if sys.stdout.encoding.lower() != "utf-8":
@@ -15,14 +16,14 @@ if sys.stdout.encoding.lower() != "utf-8":
         pass
 
 
-def mock_tool_call(tool_name: str, query: str):
+def mock_tool_call(tool_name: str, query: str) -> dict:
     """Simulates a tool that repeatedly returns incomplete data."""
     if query == "broken_query":
         return {"status": "retry_needed", "data": None}
     return {"status": "success", "data": f"Resolved answers for '{query}'"}
 
 
-def run_agent_demonstration():
+def run_agent_demonstration() -> None:
     print("=== Starting unloop Native Loop Demonstration ===")
     db_file = "demo_agent.unloop"
 
@@ -59,6 +60,9 @@ def run_agent_demonstration():
                     print(f"\n[BREAKPOINT HIT] {step.snapshot.breakpoint_reason}")
                     loop_tripped_at = step.snapshot.turn_id
                     break
+
+        if loop_tripped_at:
+            print(f"[*] Watchdog caught loop at Turn ID: {loop_tripped_at[:8]}")
 
         # Time-Travel Rewind & In-Place State Mutation
         print("\n--- Performing Time-Travel Rewind ---")

@@ -1,11 +1,19 @@
 """unloop runtime package."""
 
 from unloop.runtime.breakpoints import Breakpoint, BreakpointManager
-from unloop.runtime.interceptor import UnloopSession, AgdbSession, BreakpointHalt, TurnContext
+from unloop.runtime.interceptor import (
+    AgdbSession,
+    BreakpointHalt,
+    TurnContext,
+    UnloopSession,
+    agdb_trace,
+    get_current_session,
+    set_current_session,
+    trace,
+)
 from unloop.runtime.watchdog import OscillationAlert, OscillationWatchdog
 
 __all__ = [
-    "UnloopSession",
     "AgdbSession",
     "Breakpoint",
     "BreakpointHalt",
@@ -13,4 +21,9 @@ __all__ = [
     "OscillationAlert",
     "OscillationWatchdog",
     "TurnContext",
+    "UnloopSession",
+    "agdb_trace",
+    "get_current_session",
+    "set_current_session",
+    "trace",
 ]

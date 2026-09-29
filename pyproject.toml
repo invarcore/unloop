@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "unloop"
 version = "0.1.0"
-description = "The Time-Travel Debugger for AI Agents — Break out of critique loops, rewind cognitive turns, and mutate state in-flight"
+description = "The Time-Travel Debugger for AI Agents - Break out of critique loops, rewind cognitive turns, and mutate state in-flight"
 readme = "README.md"
 authors = [
     { name = "Vinay Kumar Ksheera Sagar", email = "sagarv.kumar48@gmail.com" }
@@ -38,6 +38,7 @@ dependencies = [
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.1.0",
+    "ruff>=0.4.0",
 ]
 
 [project.scripts]
@@ -45,3 +46,26 @@ unloop = "unloop.cli.main:cli"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/unloop"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+    "RUF",  # ruff-specific
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"

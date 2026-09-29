@@ -1,5 +1,5 @@
 """unloop storage package."""
 
-from unloop.storage.db import UnloopStore, AgdbStore
+from unloop.storage.db import AgdbStore, UnloopStore
 
-__all__ = ["UnloopStore", "AgdbStore"]
+__all__ = ["AgdbStore", "UnloopStore"]

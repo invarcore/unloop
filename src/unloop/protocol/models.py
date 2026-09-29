@@ -10,7 +10,8 @@ import hashlib
 import json
 import time
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -24,9 +25,9 @@ class ToolInvocationRecord(BaseModel):
 
     call_id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
     tool_name: str
-    arguments: Dict[str, Any] = Field(default_factory=dict)
-    result: Optional[Any] = None
-    error: Optional[str] = None
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    result: Any | None = None
+    error: str | None = None
     duration_ms: float = 0.0
 
     @property
@@ -46,43 +47,43 @@ class TokenTelemetry(BaseModel):
 
 class TurnSnapshot(BaseModel):
     """Immutable snapshot of an agent cognitive turn.
-    
+
     Forms a node in the Directed Acyclic Graph (DAG) of the agent execution.
     """
 
     turn_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     session_id: str
-    parent_id: Optional[str] = None
+    parent_id: str | None = None
     branch_id: str = "main"
     turn_index: int = 0
     timestamp: float = Field(default_factory=time.time)
 
     # Cognitive content
-    prompt: Optional[str] = None
-    response: Optional[str] = None
-    messages: List[Dict[str, Any]] = Field(default_factory=list)
+    prompt: str | None = None
+    response: str | None = None
+    messages: list[dict[str, Any]] = Field(default_factory=list)
 
     # State & Memory
-    state: Dict[str, Any] = Field(default_factory=dict)
-    state_delta: Optional[Dict[str, Any]] = None
+    state: dict[str, Any] = Field(default_factory=dict)
+    state_delta: dict[str, Any] | None = None
 
     # Actions & Telemetry
-    tool_invocations: List[ToolInvocationRecord] = Field(default_factory=list)
+    tool_invocations: list[ToolInvocationRecord] = Field(default_factory=list)
     telemetry: TokenTelemetry = Field(default_factory=TokenTelemetry)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     # Debugging control
     is_breakpoint: bool = False
-    breakpoint_reason: Optional[str] = None
+    breakpoint_reason: str | None = None
 
     @property
     def state_hash(self) -> str:
         """Cryptographic checksum of current agent state."""
         return hashlib.sha256(_canonical_json(self.state).encode()).hexdigest()[:16]
 
-    def compute_state_delta(self, previous_state: Dict[str, Any]) -> Dict[str, Any]:
+    def compute_state_delta(self, previous_state: dict[str, Any]) -> dict[str, Any]:
         """Compute key-level diff between parent state and current state."""
-        delta: Dict[str, Any] = {"added": {}, "modified": {}, "removed": []}
+        delta: dict[str, Any] = {"added": {}, "modified": {}, "removed": []}
         all_keys = set(previous_state.keys()) | set(self.state.keys())
 
         for k in all_keys:
@@ -107,8 +108,8 @@ class SessionMetadata(BaseModel):
     name: str = "agent_run"
     created_at: float = Field(default_factory=time.time)
     framework: str = "custom"
-    model_name: Optional[str] = None
-    agent_goal: Optional[str] = None
+    model_name: str | None = None
+    agent_goal: str | None = None
     total_turns: int = 0
     active_branch: str = "main"
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)

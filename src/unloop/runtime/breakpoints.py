@@ -1,23 +1,24 @@
-"""Breakpoint manager and condition evaluator for unloop."""
+"""Execution breakpoint management and conditional triggers."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from unloop.protocol.models import TurnSnapshot
 
 
 @dataclass
 class Breakpoint:
-    """A registered execution breakpoint."""
+    """Represents an execution breakpoint trigger rule."""
 
     id: str
     on_error: bool = False
-    tool_name: Optional[str] = None
-    turn_index: Optional[int] = None
-    condition: Optional[Callable[[Dict[str, Any]], bool]] = None
-    condition_repr: Optional[str] = None
+    tool_name: str | None = None
+    turn_index: int | None = None
+    condition: Callable[[dict[str, Any]], bool] | None = None
+    condition_repr: str | None = None
     on_watchdog: bool = True
     enabled: bool = True
 
@@ -25,17 +26,17 @@ class Breakpoint:
 class BreakpointManager:
     """Evaluates whether an active turn satisfies any registered breakpoint."""
 
-    def __init__(self):
-        self._breakpoints: Dict[str, Breakpoint] = {}
+    def __init__(self) -> None:
+        self._breakpoints: dict[str, Breakpoint] = {}
         self._counter: int = 0
 
     def add(
         self,
         on_error: bool = False,
-        tool_name: Optional[str] = None,
-        turn_index: Optional[int] = None,
-        condition: Optional[Callable[[Dict[str, Any]], bool]] = None,
-        condition_repr: Optional[str] = None,
+        tool_name: str | None = None,
+        turn_index: int | None = None,
+        condition: Callable[[dict[str, Any]], bool] | None = None,
+        condition_repr: str | None = None,
         on_watchdog: bool = True,
     ) -> str:
         """Register a new breakpoint. Returns the breakpoint ID."""
@@ -56,11 +57,11 @@ class BreakpointManager:
         """Remove a breakpoint by ID."""
         return self._breakpoints.pop(bp_id, None) is not None
 
-    def list_breakpoints(self) -> List[Breakpoint]:
+    def list_breakpoints(self) -> list[Breakpoint]:
         """List all active breakpoints."""
         return list(self._breakpoints.values())
 
-    def check(self, turn: TurnSnapshot, watchdog_tripped: bool = False) -> tuple[bool, Optional[str]]:
+    def check(self, turn: TurnSnapshot, watchdog_tripped: bool = False) -> tuple[bool, str | None]:
         """Evaluate if any enabled breakpoint is triggered by this turn."""
         for bp in self._breakpoints.values():
             if not bp.enabled:
@@ -91,8 +92,8 @@ class BreakpointManager:
                 try:
                     if bp.condition(turn.state):
                         return True, f"[{bp.id}] Condition satisfied: {bp.condition_repr}"
-                except Exception as ex:
-                    # Condition evaluation failure
+                except Exception:
+                    # Condition evaluation failed safely
                     pass
 
         return False, None
