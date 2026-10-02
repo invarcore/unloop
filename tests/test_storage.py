@@ -70,3 +70,62 @@ def test_storage_crud_and_branching() -> None:
             assert diff["state_diff"]["modified"]["step"]["turn_b"] == 1
         finally:
             store.close()
+
+
+def test_storage_append_only_enforcement() -> None:
+    import pytest
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "append_only.unloop"
+        with UnloopStore(db_path) as store:
+            meta = SessionMetadata(name="append_test")
+            store.create_session(meta)
+
+            turn = TurnSnapshot(session_id=meta.session_id, turn_index=0, prompt="Original")
+            store.save_turn(turn)
+
+            # Trying to overwrite without allow_update must raise ValueError
+            turn_modified = TurnSnapshot(
+                turn_id=turn.turn_id,
+                session_id=meta.session_id,
+                turn_index=0,
+                prompt="Attempted overwrite",
+            )
+            with pytest.raises(ValueError, match="strictly append-only"):
+                store.save_turn(turn_modified)
+
+
+def test_storage_encryption_and_redaction() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "secure.unloop"
+        key = "unloop_secret_vault_key"
+
+        with UnloopStore(db_path, encryption_key=key, redact_secrets=True) as store:
+            meta = SessionMetadata(name="secure_test")
+            store.create_session(meta)
+
+            turn = TurnSnapshot(
+                session_id=meta.session_id,
+                turn_index=0,
+                prompt="Use Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.sensitive secret",
+                response="Normal response",
+                state={"password": "MySecretPassword123", "step": 1},
+            )
+            store.save_turn(turn)
+
+            # Check raw SQLite row is encrypted and redacted
+            cursor = store.conn.cursor()
+            raw_row = cursor.execute("SELECT prompt, state_json FROM turns WHERE turn_id = ?", (turn.turn_id,)).fetchone()
+            raw_prompt = raw_row[0]
+            raw_state = raw_row[1]
+
+            # Should be encrypted with enc: prefix
+            assert raw_prompt.startswith("enc:")
+            assert raw_state.startswith("enc:")
+
+            # When reading through the store with the key, it decrypts and shows redacted secret
+            retrieved = store.get_turn(turn.turn_id)
+            assert retrieved is not None
+            assert "[REDACTED]" in retrieved.prompt
+            assert "eyJhbGci" not in retrieved.prompt
+            assert "[REDACTED]" in str(retrieved.state["password"])

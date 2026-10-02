@@ -83,6 +83,9 @@ class BreakpointManager:
 
             # 4. Error trigger
             if bp.on_error:
+                turn_err = getattr(turn, "error", None) or (turn.metadata or {}).get("error")
+                if turn_err is not None:
+                    return True, f"[{bp.id}] Turn execution error encountered: {turn_err}"
                 for tool in turn.tool_invocations:
                     if tool.error is not None:
                         return True, f"[{bp.id}] Tool error encountered in '{tool.tool_name}': {tool.error}"

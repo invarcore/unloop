@@ -229,6 +229,30 @@ def record(output: str, command: tuple[str, ...]) -> None:
 
     result = subprocess.run(cmd_list, env=env)
 
+    # If the target process didn't initialize an unloop store, record the bare execution
+    if not Path(output).exists():
+        with UnloopStore(output) as store:
+            meta = SessionMetadata(
+                name=Path(cmd_list[0]).name if cmd_list else "bare_command",
+                framework="subprocess",
+                agent_goal=" ".join(cmd_list),
+            )
+            store.create_session(meta)
+            t0 = TurnSnapshot(
+                session_id=meta.session_id,
+                turn_index=0,
+                prompt=" ".join(cmd_list),
+                response=f"Command finished with exit code {result.returncode}",
+                metadata={
+                    "command": cmd_list,
+                    "returncode": result.returncode,
+                    "recording_mode": "subprocess_wrapper",
+                },
+                is_breakpoint=result.returncode != 0,
+                breakpoint_reason=f"Subprocess non-zero exit code: {result.returncode}" if result.returncode != 0 else None,
+            )
+            store.save_turn(t0)
+
     if Path(output).exists():
         with UnloopStore(output) as store:
             cursor = store.conn.cursor()
@@ -280,15 +304,24 @@ def check_ci(
         # 2. Check oscillations / watchdog alerts
         if no_oscillations:
             oscillation_turns = [
-                t for t in turns if t.is_breakpoint and "Watchdog" in (t.breakpoint_reason or "")
+                t
+                for t in turns
+                if t.is_breakpoint
+                and any(
+                    kw in (t.breakpoint_reason or "").lower()
+                    for kw in ("watchdog", "oscillation", "loop", "ping-pong", "repetitive", "state_cycle")
+                )
             ]
             if oscillation_turns:
                 for ot in oscillation_turns:
                     violations.append(f"Turn #{ot.turn_index}: Oscillation detected ({ot.breakpoint_reason})")
 
-        # 3. Check tool errors
+        # 3. Check tool & turn errors
         if no_errors:
             for t in turns:
+                turn_err = getattr(t, "error", None) or (t.metadata or {}).get("error")
+                if turn_err:
+                    violations.append(f"Turn #{t.turn_index}: Turn execution error: {turn_err}")
                 for tool in t.tool_invocations:
                     if tool.error:
                         violations.append(

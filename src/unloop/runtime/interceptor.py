@@ -209,7 +209,7 @@ class UnloopSession:
             turn.breakpoint_reason = reason
         elif watchdog_tripped and alert:
             turn.is_breakpoint = True
-            turn.breakpoint_reason = alert.message
+            turn.breakpoint_reason = f"[Watchdog: {alert.alert_type}] {alert.message}"
 
         # 4. Persist to SQLite WAL
         self.store.save_turn(turn)

@@ -6,7 +6,12 @@ and session metadata with microsecond latency.
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import json
+import os
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -24,13 +29,106 @@ from unloop.protocol.models import (
     TurnSnapshot,
 )
 
+_REDACTION_PATTERNS = [
+    (re.compile(r"(?i)(bearer\s+)[A-Za-z0-9_\-\.]{16,}"), r"\1[REDACTED]"),
+    (re.compile(r"(?i)(api[_-]?key[\"'\s:=]+)[A-Za-z0-9_\-]{16,}"), r"\1[REDACTED]"),
+    (re.compile(r"(?i)(secret[\"'\s:=]+)[A-Za-z0-9_\-]{16,}"), r"\1[REDACTED]"),
+    (re.compile(r"(?i)(password[\"'\s:=]+)[^\s,\"'}]{6,}"), r"\1[REDACTED]"),
+    (re.compile(r"sk-[A-Za-z0-9]{20,}"), "[REDACTED]"),
+]
+
+
+_SENSITIVE_KEY_PATTERN = re.compile(
+    r"(?i)(password|secret|api[_-]?key|token|auth|credential|private[_-]?key)"
+)
+
+
+def redact_sensitive_text(text: str | None) -> str | None:
+    """Scrub sensitive credentials, bearer tokens, and API keys from text."""
+    if not text:
+        return text
+    redacted = text
+    for pat, repl in _REDACTION_PATTERNS:
+        redacted = pat.sub(repl, redacted)
+    return redacted
+
+
+def redact_sensitive_dict(d: dict[str, Any]) -> dict[str, Any]:
+    """Recursively scrub sensitive keys and credential patterns from dictionary structures."""
+    out: dict[str, Any] = {}
+    for k, v in d.items():
+        if isinstance(v, str):
+            if _SENSITIVE_KEY_PATTERN.search(str(k)):
+                out[k] = "[REDACTED]"
+            else:
+                out[k] = redact_sensitive_text(v)
+        elif isinstance(v, dict):
+            out[k] = redact_sensitive_dict(v)
+        elif isinstance(v, list):
+            out[k] = [
+                redact_sensitive_dict(item) if isinstance(item, dict)
+                else (redact_sensitive_text(item) if isinstance(item, str) else item)
+                for item in v
+            ]
+        else:
+            out[k] = v
+    return out
+
+
+def _cipher_transform(data: bytes, key: str) -> bytes:
+    """Deterministic HMAC-SHA256 keystream stream cipher for application-level encryption."""
+    key_bytes = hashlib.sha256(key.encode("utf-8")).digest()
+    out = bytearray(len(data))
+    block_index = 0
+    while block_index * 32 < len(data):
+        counter = block_index.to_bytes(8, "big")
+        keystream = hmac.new(key_bytes, counter, hashlib.sha256).digest()
+        for i in range(min(32, len(data) - block_index * 32)):
+            out[block_index * 32 + i] = data[block_index * 32 + i] ^ keystream[i]
+        block_index += 1
+    return bytes(out)
+
+
+def encrypt_field(text: str | None, key: str | None) -> str | None:
+    """Encrypt field value using application key if configured."""
+    if not text or not key:
+        return text
+    raw_bytes = text.encode("utf-8")
+    enc_bytes = _cipher_transform(raw_bytes, key)
+    return "enc:" + base64.b64encode(enc_bytes).decode("ascii")
+
+
+def decrypt_field(text: str | None, key: str | None) -> str | None:
+    """Decrypt field value using application key if it was encrypted."""
+    if not text or not key:
+        return text
+    if not text.startswith("enc:"):
+        return text
+    try:
+        enc_bytes = base64.b64decode(text[4:])
+        dec_bytes = _cipher_transform(enc_bytes, key)
+        return dec_bytes.decode("utf-8")
+    except Exception:
+        return text
+
 
 class UnloopStore:
     """SQLite WAL storage engine managing sessions, turns, and branch DAGs."""
 
-    def __init__(self, db_path: str | Path):
+    def __init__(
+        self,
+        db_path: str | Path,
+        encryption_key: str | None = None,
+        redact_secrets: bool | None = None,
+    ):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.encryption_key = encryption_key or os.environ.get("UNLOOP_ENCRYPTION_KEY")
+        self.redact_secrets = (
+            redact_secrets
+            if redact_secrets is not None
+            else (os.environ.get("UNLOOP_REDACT_SECRETS", "1").lower() not in ("0", "false", "off"))
+        )
         self.conn = sqlite3.connect(str(self.db_path))
         self.conn.row_factory = sqlite3.Row
         self._init_db()
@@ -153,38 +251,95 @@ class UnloopStore:
             metadata=json.loads(row["metadata_json"] or "{}"),
         )
 
-    def save_turn(self, turn: TurnSnapshot) -> None:
-        """Persist a turn snapshot and update branch HEAD."""
+    def save_turn(self, turn: TurnSnapshot, allow_update: bool = False) -> None:
+        """Persist a turn snapshot append-only and update branch HEAD."""
+        prompt = turn.prompt
+        response = turn.response
+        messages = turn.messages
+        state = turn.state
+        state_delta = turn.state_delta
+        tools_list = [t.model_dump() for t in turn.tool_invocations]
+        telemetry_dict = turn.telemetry.model_dump()
+        metadata_dict = turn.metadata
+
+        if self.redact_secrets:
+            prompt = redact_sensitive_text(prompt)
+            response = redact_sensitive_text(response)
+            if messages:
+                messages = [
+                    redact_sensitive_dict(m) if isinstance(m, dict) else m
+                    for m in messages
+                ]
+            if state:
+                state = redact_sensitive_dict(state)
+
+        messages_json = json.dumps(messages)
+        state_json = json.dumps(state)
+        state_delta_json = json.dumps(state_delta) if state_delta else None
+        tools_json = json.dumps(tools_list)
+        telemetry_json = json.dumps(telemetry_dict)
+        metadata_json = json.dumps(metadata_dict)
+
+        if self.encryption_key:
+            prompt = encrypt_field(prompt, self.encryption_key)
+            response = encrypt_field(response, self.encryption_key)
+            messages_json = encrypt_field(messages_json, self.encryption_key)
+            state_json = encrypt_field(state_json, self.encryption_key)
+            if state_delta_json:
+                state_delta_json = encrypt_field(state_delta_json, self.encryption_key)
+            tools_json = encrypt_field(tools_json, self.encryption_key)
+
+        params = (
+            turn.turn_id,
+            turn.session_id,
+            turn.parent_id,
+            turn.branch_id,
+            turn.turn_index,
+            turn.timestamp,
+            prompt,
+            response,
+            messages_json,
+            state_json,
+            state_delta_json,
+            turn.state_hash,
+            tools_json,
+            telemetry_json,
+            metadata_json,
+            1 if turn.is_breakpoint else 0,
+            turn.breakpoint_reason,
+        )
+
         with self.conn:
-            self.conn.execute(
-                """
-                INSERT OR REPLACE INTO turns (
-                    turn_id, session_id, parent_id, branch_id, turn_index, timestamp,
-                    prompt, response, messages_json, state_json, state_delta_json,
-                    state_hash, tools_json, telemetry_json, metadata_json,
-                    is_breakpoint, breakpoint_reason
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    turn.turn_id,
-                    turn.session_id,
-                    turn.parent_id,
-                    turn.branch_id,
-                    turn.turn_index,
-                    turn.timestamp,
-                    turn.prompt,
-                    turn.response,
-                    json.dumps(turn.messages),
-                    json.dumps(turn.state),
-                    json.dumps(turn.state_delta) if turn.state_delta else None,
-                    turn.state_hash,
-                    json.dumps([t.model_dump() for t in turn.tool_invocations]),
-                    json.dumps(turn.telemetry.model_dump()),
-                    json.dumps(turn.metadata),
-                    1 if turn.is_breakpoint else 0,
-                    turn.breakpoint_reason,
-                ),
-            )
+            if allow_update:
+                self.conn.execute(
+                    """
+                    INSERT OR REPLACE INTO turns (
+                        turn_id, session_id, parent_id, branch_id, turn_index, timestamp,
+                        prompt, response, messages_json, state_json, state_delta_json,
+                        state_hash, tools_json, telemetry_json, metadata_json,
+                        is_breakpoint, breakpoint_reason
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    params,
+                )
+            else:
+                try:
+                    self.conn.execute(
+                        """
+                        INSERT INTO turns (
+                            turn_id, session_id, parent_id, branch_id, turn_index, timestamp,
+                            prompt, response, messages_json, state_json, state_delta_json,
+                            state_hash, tools_json, telemetry_json, metadata_json,
+                            is_breakpoint, breakpoint_reason
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        params,
+                    )
+                except sqlite3.IntegrityError as exc:
+                    raise ValueError(
+                        f"Turn '{turn.turn_id}' already exists in session '{turn.session_id}'. Unloop storage is strictly append-only."
+                    ) from exc
+
             # Update branch HEAD
             self.conn.execute(
                 """
@@ -303,7 +458,23 @@ class UnloopStore:
         }
 
     def _row_to_turn(self, row: sqlite3.Row) -> TurnSnapshot:
-        tools_data = json.loads(row["tools_json"] or "[]")
+        prompt = row["prompt"]
+        response = row["response"]
+        messages_str = row["messages_json"]
+        state_str = row["state_json"]
+        state_delta_str = row["state_delta_json"]
+        tools_str = row["tools_json"]
+
+        if self.encryption_key:
+            prompt = decrypt_field(prompt, self.encryption_key)
+            response = decrypt_field(response, self.encryption_key)
+            messages_str = decrypt_field(messages_str, self.encryption_key)
+            state_str = decrypt_field(state_str, self.encryption_key)
+            if state_delta_str:
+                state_delta_str = decrypt_field(state_delta_str, self.encryption_key)
+            tools_str = decrypt_field(tools_str, self.encryption_key)
+
+        tools_data = json.loads(tools_str or "[]")
         tools = [ToolInvocationRecord(**t) for t in tools_data]
         telem_data = json.loads(row["telemetry_json"] or "{}")
         telemetry = TokenTelemetry(**telem_data)
@@ -315,11 +486,11 @@ class UnloopStore:
             branch_id=row["branch_id"],
             turn_index=row["turn_index"],
             timestamp=row["timestamp"],
-            prompt=row["prompt"],
-            response=row["response"],
-            messages=json.loads(row["messages_json"] or "[]"),
-            state=json.loads(row["state_json"] or "{}"),
-            state_delta=json.loads(row["state_delta_json"]) if row["state_delta_json"] else None,
+            prompt=prompt,
+            response=response,
+            messages=json.loads(messages_str or "[]"),
+            state=json.loads(state_str or "{}"),
+            state_delta=json.loads(state_delta_str) if state_delta_str else None,
             tool_invocations=tools,
             telemetry=telemetry,
             metadata=json.loads(row["metadata_json"] or "{}"),

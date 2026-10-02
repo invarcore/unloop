@@ -176,7 +176,7 @@ class UnloopTuiApp(App):
         mutated_state = dict(self.selected_turn.state)
         mutated_state["_mutated_in_tui"] = True
         self.selected_turn.state = mutated_state
-        self.store.save_turn(self.selected_turn)
+        self.store.save_turn(self.selected_turn, allow_update=True)
         self.notify(f"Mutated state on turn #{self.selected_turn.turn_index}.", severity="information")
         self._update_views(self.selected_turn)
 
