@@ -11,10 +11,13 @@ dist/
 # Virtual Environments
 .venv/
 
-# SQLite & agdb cassettes
+# SQLite & agdb / unloop cassettes
 *.agdb
 *.agdb-wal
 *.agdb-shm
+*.unloop
+*.unloop-wal
+*.unloop-shm
 
 # Pytest & Coverage
 .pytest_cache/

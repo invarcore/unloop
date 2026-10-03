@@ -1,4 +1,4 @@
-﻿<p align="center">
+<p align="center">
   <img src="./assets/logo.png" alt="unloop logo" width="180px" style="border-radius: 24px; box-shadow: 0 8px 32px rgba(0, 240, 255, 0.25);" />
 </p>
 
@@ -266,8 +266,17 @@ uv sync --all-extras
 # Run linter
 uv run ruff check .
 
-# Run comprehensive test suite
-uv run pytest -v
+# Run test suite with strict coverage enforcement (>=90%)
+uv run pytest --cov=unloop --cov-report=term-missing --cov-fail-under=90
+
+# Run local hermetic end-to-end time-travel smoke test (<200ms)
+uv run python benchmarks/live_debugger_smoke_test.py
+
+# Optional: Run live tracing verification against OpenRouter Free Tier
+uv run python benchmarks/live_debugger_smoke_test.py --openrouter --model openrouter/free
+
+# Run hermetic containerized test suite via Docker Compose
+docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
 
 # Run interactive loop recovery demonstration
 uv run python examples/01_native_loop_agent.py

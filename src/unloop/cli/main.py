@@ -16,6 +16,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from unloop.protocol.models import SessionMetadata, TurnSnapshot
 from unloop.storage.db import UnloopStore
 
 console = Console()

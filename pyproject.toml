@@ -68,4 +68,4 @@ ignore = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short --cov=unloop --cov-report=term-missing --cov-fail-under=90"
