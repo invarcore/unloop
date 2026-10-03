@@ -1,0 +1,123 @@
+{
+  "instance_id": "encode__httpx-1422",
+  "problem_statement": "AsyncClient read timeout during HTTP/2 multiplexing raises generic TransportError instead of TimeoutException",
+  "environment": {
+    "python": "3.11",
+    "pytest": "8.1.0"
+  },
+  "turns": [
+    {
+      "turn_id": "turn_001",
+      "thought": "Locate connection timeout handler in default transport implementation.",
+      "tool_name": "read_file",
+      "arguments": {
+        "path": "httpx/_transports/default.py",
+        "start_line": 100,
+        "end_line": 180
+      },
+      "observation": "Found handle_async_request method calling httpcore.AsyncConnectionPool.",
+      "state": {
+        "file_hash": "a1b2c3d4e5f60001",
+        "patch_id": "baseline_unmodified",
+        "last_action": "inspect_source",
+        "test_status": "not_run"
+      }
+    },
+    {
+      "turn_id": "turn_002",
+      "thought": "Execute pytest to reproduce test_read_timeout failure.",
+      "tool_name": "run_command",
+      "arguments": {
+        "cmd": "pytest tests/test_transports.py -k test_read_timeout"
+      },
+      "observation": "FAILED tests/test_transports.py::test_read_timeout - TransportError: connection timed out",
+      "state": {
+        "file_hash": "a1b2c3d4e5f60001",
+        "patch_id": "baseline_unmodified",
+        "last_action": "reproduce_failure",
+        "test_status": "failed_read_timeout"
+      }
+    },
+    {
+      "turn_id": "turn_003",
+      "thought": "Attempt fix option A: Map all httpcore.TimeoutException to httpx.ReadTimeout unconditionally.",
+      "tool_name": "edit_file",
+      "arguments": {
+        "path": "httpx/_transports/default.py",
+        "pattern": "except httpcore.TimeoutException:",
+        "replacement": "except httpcore.TimeoutException as exc:\n    raise ReadTimeout(str(exc)) from exc"
+      },
+      "observation": "File modified successfully.",
+      "state": {
+        "file_hash": "f6e5d4c3b2a10002",
+        "patch_id": "patch_option_a",
+        "last_action": "apply_patch_a",
+        "test_status": "pending_verification"
+      }
+    },
+    {
+      "turn_id": "turn_004",
+      "thought": "Re-run pytest to verify option A fix.",
+      "tool_name": "run_command",
+      "arguments": {
+        "cmd": "pytest tests/test_transports.py -k test_connect_timeout"
+      },
+      "observation": "FAILED tests/test_transports.py::test_connect_timeout - Expected ConnectTimeout but got ReadTimeout",
+      "state": {
+        "file_hash": "f6e5d4c3b2a10002",
+        "patch_id": "patch_option_a",
+        "last_action": "verify_patch_a",
+        "test_status": "failed_connect_timeout_regression"
+      }
+    },
+    {
+      "turn_id": "turn_005",
+      "thought": "Revert option A and try fix option B: Inspect exception hierarchy and only map during stream read.",
+      "tool_name": "edit_file",
+      "arguments": {
+        "path": "httpx/_transports/default.py",
+        "pattern": "raise ReadTimeout",
+        "replacement": "if isinstance(exc, httpcore.ConnectTimeout):\n    raise ConnectTimeout(str(exc))\nraise ReadTimeout(str(exc))"
+      },
+      "observation": "File modified successfully.",
+      "state": {
+        "file_hash": "b2c3d4e5f6a10003",
+        "patch_id": "patch_option_b",
+        "last_action": "apply_patch_b",
+        "test_status": "pending_verification"
+      }
+    },
+    {
+      "turn_id": "turn_006",
+      "thought": "Re-run pytest to verify option B fix.",
+      "tool_name": "run_command",
+      "arguments": {
+        "cmd": "pytest tests/test_transports.py -k test_pool_timeout"
+      },
+      "observation": "FAILED tests/test_transports.py::test_pool_timeout - Expected PoolTimeout but got ReadTimeout",
+      "state": {
+        "file_hash": "b2c3d4e5f6a10003",
+        "patch_id": "patch_option_b",
+        "last_action": "verify_patch_b",
+        "test_status": "failed_pool_timeout_regression"
+      }
+    },
+    {
+      "turn_id": "turn_007",
+      "thought": "Reverting back to patch option A to retry with flag adjustment.",
+      "tool_name": "edit_file",
+      "arguments": {
+        "path": "httpx/_transports/default.py",
+        "pattern": "except httpcore.TimeoutException:",
+        "replacement": "except httpcore.TimeoutException as exc:\n    raise ReadTimeout(str(exc)) from exc"
+      },
+      "observation": "File reverted to patch option A.",
+      "state": {
+        "file_hash": "f6e5d4c3b2a10002",
+        "patch_id": "patch_option_a",
+        "last_action": "apply_patch_a",
+        "test_status": "pending_verification"
+      }
+    }
+  ]
+}
