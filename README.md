@@ -255,6 +255,11 @@ unloop replay run.unloop
 
 ## 🧪 Development & Testing
 
+Unloop maintains strict test coverage (**>=90% enforced in CI**) and a zero-live-HTTP CI architecture:
+
+- **Tier 1 (Golden Trajectory Fixtures)**: Real-world multi-turn developer debugging trajectories derived from SWE-bench (`encode__httpx-1422`) checked into `tests/fixtures/corpora/` for deterministic, sub-second oscillation and time-travel validation.
+- **Tier 2 (Opt-in Live Harness)**: Live cloud agent tracing verification against OpenRouter (`benchmarks/live_debugger_smoke_test.py --openrouter`).
+
 ```bash
 # Clone the repository
 git clone https://github.com/sagarv48/unloop.git
