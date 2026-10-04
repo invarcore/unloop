@@ -10,11 +10,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/sagarv48/unloop/actions"><img src="https://github.com/sagarv48/unloop/actions/workflows/ci.yml/badge.svg" alt="CI Status"></a>
+  <a href="https://github.com/invarcore/unloop/actions"><img src="https://github.com/invarcore/unloop/actions/workflows/ci.yml/badge.svg" alt="CI Status"></a>
   <a href="https://pypi.org/project/unloop/"><img src="https://img.shields.io/badge/PyPI-v0.1.0-blue.svg" alt="PyPI Version"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-3776AB.svg?logo=python&logoColor=white" alt="Python Versions"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License"></a>
-  <a href="https://github.com/sagarv48/unloop"><img src="https://img.shields.io/badge/Storage-SQLite%20WAL%20(%3C2ms)-orange.svg" alt="Storage Overhead"></a>
+  <a href="https://github.com/invarcore/unloop"><img src="https://img.shields.io/badge/Storage-SQLite%20WAL%20(%3C2ms)-orange.svg" alt="Storage Overhead"></a>
 </p>
 
 ---
@@ -262,7 +262,7 @@ Unloop maintains strict test coverage (**>=90% enforced in CI**) and a zero-live
 
 ```bash
 # Clone the repository
-git clone https://github.com/sagarv48/unloop.git
+git clone https://github.com/invarcore/unloop.git
 cd unloop
 
 # Install with development dependencies using uv
