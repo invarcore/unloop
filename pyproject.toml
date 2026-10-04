@@ -34,6 +34,13 @@ dependencies = [
     "textual>=0.70.0",
 ]
 
+[project.urls]
+Homepage = "https://invarcore.com"
+Documentation = "https://invarcore.com"
+Repository = "https://github.com/invarcore/unloop"
+"Bug Tracker" = "https://github.com/invarcore/unloop/issues"
+"Technical Whitepapers" = "https://invarcore.com/#whitepapers"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
