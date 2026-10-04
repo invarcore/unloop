@@ -1,3 +1,6 @@
+# Copyright 2026 Invarcore Organization
+# SPDX-License-Identifier: MIT
+
 """unloop runtime package."""
 
 from unloop.runtime.breakpoints import Breakpoint, BreakpointManager

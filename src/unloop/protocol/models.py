@@ -1,3 +1,6 @@
+# Copyright 2026 Invarcore Organization
+# SPDX-License-Identifier: MIT
+
 """Canonical protocol models for unloop (Agent GNU Debugger).
 
 These models define the framework-agnostic TurnSnapshot, StateDelta,

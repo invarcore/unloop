@@ -1,3 +1,6 @@
+# Copyright 2026 Invarcore Organization
+# SPDX-License-Identifier: MIT
+
 """Anti-oscillation and loop detection watchdog for AI agents.
 
 Monitors sliding windows of tool invocations and state checksums to detect

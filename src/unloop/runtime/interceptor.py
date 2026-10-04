@@ -1,3 +1,6 @@
+# Copyright 2026 Invarcore Organization
+# SPDX-License-Identifier: MIT
+
 """Runtime execution interceptor, turn context manager, and tracing decorator."""
 
 from __future__ import annotations

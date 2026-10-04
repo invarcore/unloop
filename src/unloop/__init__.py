@@ -1,3 +1,6 @@
+# Copyright 2026 Invarcore Organization
+# SPDX-License-Identifier: MIT
+
 """unloop: The Time-Travel Debugger for AI Agents.
 
 Break out of critique loops, rewind cognitive turns, and mutate state in-flight.

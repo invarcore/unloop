@@ -1,3 +1,6 @@
+# Copyright 2026 Invarcore Organization
+# SPDX-License-Identifier: MIT
+
 """unloop CLI: The Agent GNU Debugger command-line interface.
 
 Terminal time-travel stepper, headless CI runner, and post-mortem inspector.

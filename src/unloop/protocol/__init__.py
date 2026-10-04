@@ -1,3 +1,6 @@
+# Copyright 2026 Invarcore Organization
+# SPDX-License-Identifier: MIT
+
 """unloop protocol package."""
 
 from unloop.protocol.models import (

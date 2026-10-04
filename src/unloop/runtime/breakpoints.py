@@ -1,3 +1,6 @@
+# Copyright 2026 Invarcore Organization
+# SPDX-License-Identifier: MIT
+
 """Execution breakpoint management and conditional triggers."""
 
 from __future__ import annotations

@@ -1,3 +1,6 @@
+# Copyright 2026 Invarcore Organization
+# SPDX-License-Identifier: MIT
+
 """Interactive Textual TUI for unloop.
 
 Features a 3-pane layout for inspecting agent cognitive trajectories:

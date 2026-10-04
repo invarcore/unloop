@@ -1,3 +1,6 @@
+# Copyright 2026 Invarcore Organization
+# SPDX-License-Identifier: MIT
+
 """SQLite WAL storage engine for unloop.
 
 Provides atomic, append-only persistence of TurnSnapshots, branching trees,
