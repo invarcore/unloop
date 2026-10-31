@@ -339,4 +339,4 @@ This engine is part of the **[Invarcore](https://invarcore.com)** enterprise ver
 
 ## 📄 License
 
-MIT © [VinayKumar KsheeraSagar](https://www.linkedin.com/in/vinaykumar-ksheerasagar-92270024)
+MIT © [VinayKumar KsheeraSagar](https://github.com/sagarv48)
