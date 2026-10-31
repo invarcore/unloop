@@ -446,6 +446,10 @@ class UnloopStore:
         tools_a = [t.tool_name for t in turn_a.tool_invocations]
         tools_b = [t.tool_name for t in turn_b.tool_invocations]
 
+        prompt_diff = turn_b.compute_prompt_diff(turn_a.prompt)
+        side_effects_a = [t.model_dump() for t in turn_a.side_effect_invocations]
+        side_effects_b = [t.model_dump() for t in turn_b.side_effect_invocations]
+
         return {
             "turn_a_index": turn_a.turn_index,
             "turn_b_index": turn_b.turn_index,
@@ -458,6 +462,9 @@ class UnloopStore:
             "prompt_b": turn_b.prompt,
             "response_a": turn_a.response,
             "response_b": turn_b.response,
+            "prompt_diff": prompt_diff,
+            "side_effects_a": side_effects_a,
+            "side_effects_b": side_effects_b,
         }
 
     def _row_to_turn(self, row: sqlite3.Row) -> TurnSnapshot:

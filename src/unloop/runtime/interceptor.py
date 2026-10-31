@@ -26,6 +26,7 @@ from unloop.protocol.models import (
     TokenTelemetry,
     ToolInvocationRecord,
     TurnSnapshot,
+    is_side_effect_tool_name,
 )
 from unloop.runtime.breakpoints import BreakpointManager
 from unloop.runtime.watchdog import OscillationAlert, OscillationWatchdog
@@ -85,17 +86,41 @@ class TurnContext:
         result: Any | None = None,
         error: str | None = None,
         duration_ms: float = 0.0,
+        is_side_effect: bool | None = None,
+        idempotency_key: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> ToolInvocationRecord:
         """Record a tool execution within this turn."""
+        if is_side_effect is None:
+            is_side_effect = is_side_effect_tool_name(tool_name)
+
         rec = ToolInvocationRecord(
             tool_name=tool_name,
             arguments=arguments,
             result=result,
             error=error,
             duration_ms=duration_ms,
+            is_side_effect=is_side_effect,
+            idempotency_key=idempotency_key,
+            metadata=metadata or {},
         )
+        self.session.check_side_effect(rec, turn=self.snapshot)
         self.snapshot.tool_invocations.append(rec)
         return rec
+
+    def is_fenced(
+        self,
+        tool_name: str,
+        arguments: dict[str, Any],
+        idempotency_key: str | None = None,
+    ) -> tuple[bool, ToolInvocationRecord | None]:
+        """Check whether a tool call would trip the replay fence before executing it."""
+        key = (
+            idempotency_key
+            or f"{tool_name}:{ToolInvocationRecord(tool_name=tool_name, arguments=arguments).argument_hash}"
+        )
+        cached = self.session.abandoned_side_effects.get(key)
+        return (cached is not None, cached)
 
     def set_response(self, response: str) -> None:
         """Set the assistant reasoning or completion content."""
@@ -136,6 +161,7 @@ class UnloopSession:
         model_name: str | None = None,
         interactive: bool = False,
         raise_on_breakpoint: bool = False,
+        side_effect_policy: str = "warn",
     ):
         if db_path is None:
             db_path = os.environ.get("UNLOOP_SESSION_FILE", "session.unloop")
@@ -154,6 +180,9 @@ class UnloopSession:
         self.breakpoints = BreakpointManager()
         self.interactive = interactive
         self.raise_on_breakpoint = raise_on_breakpoint
+        self.side_effect_policy = side_effect_policy
+        self.egress_ledger: dict[str, ToolInvocationRecord] = {}
+        self.abandoned_side_effects: dict[str, ToolInvocationRecord] = {}
 
         self._current_turn: TurnSnapshot | None = None
         self._turn_counter: int = 0
@@ -225,11 +254,61 @@ class UnloopSession:
             elif self.raise_on_breakpoint:
                 raise BreakpointHalt(turn.breakpoint_reason or "Unknown breakpoint", turn)
 
-    def rewind_to(self, turn_id: str, new_branch_name: str | None = None) -> TurnSnapshot:
+    def check_side_effect(self, rec: ToolInvocationRecord, turn: TurnSnapshot | None = None) -> None:
+        """Enforce the replay fence against abandoned or duplicate egress side effects."""
+        if not rec.is_side_effect:
+            return
+
+        key = rec.side_effect_key
+        # Check against previously abandoned side effects across rewound forks
+        if key in self.abandoned_side_effects:
+            abandoned = self.abandoned_side_effects[key]
+            rec.metadata["fenced_replay"] = True
+            rec.metadata["abandoned_origin_call_id"] = abandoned.call_id
+
+            if self.side_effect_policy == "halt":
+                target_turn = turn or self._current_turn
+                raise BreakpointHalt(
+                    f"Replay Fence tripped: Duplicate side effect '{rec.tool_name}' ({key}) on rewound fork.",
+                    target_turn or TurnSnapshot(session_id=self.session_id),
+                )
+            elif self.side_effect_policy == "stub":
+                if rec.result is None:
+                    rec.result = abandoned.result
+                rec.metadata["fenced_replay_stubbed"] = True
+            else:  # "warn"
+                rec.metadata["replay_fence_warning"] = (
+                    f"Duplicate side effect '{rec.tool_name}' ({key}) detected on rewound fork."
+                )
+
+        # Register in active session egress ledger
+        self.egress_ledger[key] = rec
+
+    def rewind_to(
+        self,
+        turn_id: str,
+        new_branch_name: str | None = None,
+        side_effect_policy: str | None = None,
+    ) -> TurnSnapshot:
         """Rewind the session to a prior turn snapshot, restoring its state for forked execution."""
         target_turn = self.store.get_turn(turn_id)
         if not target_turn:
             raise ValueError(f"Turn {turn_id} not found in store.")
+
+        if side_effect_policy is not None:
+            self.side_effect_policy = side_effect_policy
+
+        # Collect abandoned side effects from turns in the session after target_turn
+        cursor = self.store.conn.cursor()
+        rows = cursor.execute(
+            "SELECT * FROM turns WHERE session_id = ? ORDER BY turn_index ASC",
+            (self.session_id,),
+        ).fetchall()
+        for r in rows:
+            t_snap = self.store._row_to_turn(r)
+            if t_snap.turn_index > target_turn.turn_index:
+                for tool in t_snap.side_effect_invocations:
+                    self.abandoned_side_effects[tool.side_effect_key] = tool
 
         # Fork new branch if branching from past turn
         if not new_branch_name:

@@ -13,6 +13,7 @@ from unloop.protocol.models import (
     TokenTelemetry,
     ToolInvocationRecord,
     TurnSnapshot,
+    is_side_effect_tool_name,
 )
 from unloop.runtime.breakpoints import Breakpoint, BreakpointManager
 from unloop.runtime.interceptor import (
@@ -28,7 +29,7 @@ from unloop.runtime.interceptor import (
 from unloop.runtime.watchdog import OscillationAlert, OscillationWatchdog
 from unloop.storage.db import AgdbStore, UnloopStore
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 
 def session(
@@ -37,6 +38,7 @@ def session(
     framework: str = "custom",
     interactive: bool = False,
     raise_on_breakpoint: bool = False,
+    side_effect_policy: str = "warn",
 ) -> UnloopSession:
     """Convenience constructor for an unloop debugging session."""
     return UnloopSession(
@@ -45,6 +47,7 @@ def session(
         framework=framework,
         interactive=interactive,
         raise_on_breakpoint=raise_on_breakpoint,
+        side_effect_policy=side_effect_policy,
     )
 
 
@@ -66,6 +69,7 @@ __all__ = [
     "__version__",
     "agdb_trace",
     "get_current_session",
+    "is_side_effect_tool_name",
     "session",
     "set_current_session",
     "trace",

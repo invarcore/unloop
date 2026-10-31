@@ -4,11 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "unloop"
-version = "0.1.0"
+version = "0.2.0"
 description = "The Time-Travel Debugger for AI Agents - Break out of critique loops, rewind cognitive turns, and mutate state in-flight"
 readme = "README.md"
 authors = [
-    { name = "Vinay Kumar Ksheera Sagar", email = "sagarv.kumar48@gmail.com" }
+    { name = "VinayKumar KsheeraSagar", email = "sagarv.kumar48@gmail.com" }
 ]
 license = { text = "MIT" }
 requires-python = ">=3.10"

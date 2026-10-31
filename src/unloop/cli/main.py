@@ -142,8 +142,9 @@ def history(db_path: str, session_id: str | None, branch: str | None) -> None:
 @click.option("--from", "turn_a_idx", type=int, default=0, help="First turn index to compare.")
 @click.option("--to", "turn_b_idx", type=int, default=1, help="Second turn index to compare.")
 @click.option("--branch", default=None, help="Branch name (defaults to active branch).")
-def diff_turns(db_path: str, turn_a_idx: int, turn_b_idx: int, branch: str | None) -> None:
-    """Compare state and tool execution differences between two turns."""
+@click.option("--prompt", "-p", is_flag=True, default=False, help="Display detailed prompt diff and compaction analysis.")
+def diff_turns(db_path: str, turn_a_idx: int, turn_b_idx: int, branch: str | None, prompt: bool) -> None:
+    """Compare state, tool executions, side-effects, and prompt diffs between two turns."""
     with UnloopStore(db_path) as store:
         cursor = store.conn.cursor()
         row = cursor.execute(
@@ -183,6 +184,16 @@ def diff_turns(db_path: str, turn_a_idx: int, turn_b_idx: int, branch: str | Non
             ", ".join(diff_res["tools_b"]) or "<none>",
         )
 
+        # Compare side-effects
+        side_a = [t["tool_name"] for t in diff_res.get("side_effects_a", [])]
+        side_b = [t["tool_name"] for t in diff_res.get("side_effects_b", [])]
+        if side_a or side_b:
+            table.add_row(
+                "Egress Side-Effects",
+                ", ".join(side_a) or "<none>",
+                ", ".join(side_b) or "<none>",
+            )
+
         # State modifications
         s_diff = diff_res["state_diff"]
         added = s_diff["added"]
@@ -204,7 +215,47 @@ def diff_turns(db_path: str, turn_a_idx: int, turn_b_idx: int, branch: str | Non
         if not added and not removed and not modified:
             table.add_row("State Changes", "<identical state>", "<identical state>")
 
+        # Prompt & Compaction telemetry
+        p_diff = diff_res.get("prompt_diff", {})
+        if p_diff.get("has_diff"):
+            ratio_pct = f"{p_diff.get('compression_ratio', 1.0):.1%}"
+            table.add_row(
+                "Prompt Size",
+                f"{p_diff.get('prev_length', 0)} chars",
+                f"{p_diff.get('curr_length', 0)} chars ({ratio_pct})",
+            )
+            if p_diff.get("is_compacted"):
+                dropped_cnt = len(p_diff.get("removed_lines", []))
+                table.add_row(
+                    "Compaction Drops",
+                    "[dim]Original[/dim]",
+                    f"[bold red]{dropped_cnt} lines dropped[/bold red] (pass --prompt to view)",
+                )
+
         console.print(table)
+
+        # Render prompt unified diff if requested or explicitly flagged
+        if prompt:
+            if not p_diff.get("has_diff"):
+                console.print("\n[dim]Prompts are identical between these turns.[/dim]")
+            else:
+                lines = []
+                for line in p_diff.get("diff_unified", []):
+                    if line.startswith("+") and not line.startswith("+++"):
+                        lines.append(f"[green]{line}[/green]")
+                    elif line.startswith("-") and not line.startswith("---"):
+                        lines.append(f"[red]{line}[/red]")
+                    elif line.startswith("@"):
+                        lines.append(f"[cyan]{line}[/cyan]")
+                    else:
+                        lines.append(f"[dim]{line}[/dim]")
+                console.print(
+                    Panel(
+                        "\n".join(lines),
+                        title=f"Prompt Compaction Diff (#{turn_a_idx} -> #{turn_b_idx})",
+                        border_style="cyan",
+                    )
+                )
 
 
 @cli.command("record", context_settings=dict(ignore_unknown_options=True))

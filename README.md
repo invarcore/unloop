@@ -122,7 +122,40 @@ with unloop.session("research_assistant", db_path="run.unloop") as dbg:
 
 ---
 
-### 4. CI/CD Flight Recorder & Post-Mortem Cassettes
+### 4. Prompt Compaction Diffing (`unloop diff --prompt`)
+Context compression and prompt compaction are notorious for silently dropping negative constraints, schema rules, and critical facts:
+- **Raw Prompt Preservation**: Every turn snapshot captures the full model input prompt, message sequence, and token telemetry.
+- **Silent Drop Detection**: Run `unloop diff session.unloop --from 2 --to 3 --prompt` to compare pre- and post-compaction prompts.
+- **Line-by-Line Diff**: Highlights pruned constraints (in red `-`), newly introduced summaries (in green `+`), and overall compression ratio.
+
+---
+
+### 5. Egress Side-Effect Ledger & Replay Fence
+Rewinding internal agent memory does not rewind the external world. If Turn 2 sent an email or wrote to a database before Turn 3 crashed, rewinding to Turn 1 and branching would normally re-fire that external call.
+
+`unloop` introduces the **Egress Replay Fence**:
+- **Automatic Mutating Tool Detection**: Detects egress side-effects (`send_email`, `write_file`, `post_webhook`, `execute_sql`, `create_user`) or accepts explicit `is_side_effect=True` and `idempotency_key`.
+- **Egress Ledger**: When `dbg.rewind_to(turn_id)` is invoked, side effects from abandoned turns ($T_{k+1} \dots T_{now}$) are automatically cataloged.
+- **Replay Policies**:
+  - `policy="warn"`: Flags `rec.metadata["replay_fence_warning"]` on duplicate execution.
+  - `policy="stub"`: Prevents external network/disk execution and mocks the call using the cached prior response.
+  - `policy="halt"`: Instantly halts execution (`BreakpointHalt`) before the duplicate side-effect leaves the box.
+
+```python
+with unloop.session("production_agent", side_effect_policy="stub") as dbg:
+    with dbg.step(prompt="Dispatch report") as step:
+        # If rewound, the fence stubs duplicate call using previous result
+        step.record_tool(
+            "send_email",
+            {"to": "ops@example.com"},
+            is_side_effect=True,
+            idempotency_key="email:weekly_ops",
+        )
+```
+
+---
+
+### 6. CI/CD Flight Recorder & Post-Mortem Cassettes
 Run headless agent benchmarks, automated PR bots, and evaluations with zero overhead:
 
 ```yaml
@@ -182,8 +215,11 @@ unloop record -o run.unloop -- python agent.py
 # CI Quality Gate assertion (assert loop-freedom, max turns, and zero tool errors)
 unloop check run.unloop --max-turns 12 --no-oscillations --no-errors
 
-# Side-by-side state and tool execution diff between two turns
+# Side-by-side state, tool execution, and prompt diff between two turns
 unloop diff run.unloop --from 0 --to 1
+
+# Inspect line-by-line prompt diff and catch silent compaction drops
+unloop diff run.unloop --from 0 --to 1 --prompt
 
 # Display summary of recorded session metadata, tokens, and branches
 unloop info run.unloop
@@ -303,4 +339,4 @@ This engine is part of the **[Invarcore](https://invarcore.com)** enterprise ver
 
 ## 📄 License
 
-MIT © [Vinay Kumar Ksheera Sagar (sagarv48)](https://github.com/sagarv48)
+MIT © [VinayKumar KsheeraSagar](https://www.linkedin.com/in/vinaykumar-ksheerasagar-92270024)
