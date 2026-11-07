@@ -8,6 +8,14 @@ Break out of critique loops, rewind cognitive turns, and mutate state in-flight.
 
 from pathlib import Path
 
+from unloop.compaction_slots import (
+    CANONICAL_SLOTS,
+    SlotVerificationReport,
+    canonicalize_constraints_rfc8785,
+    extract_hard_constraints,
+    parse_compaction_slots,
+    verify_compaction_checkpoint,
+)
 from unloop.protocol.models import (
     SessionMetadata,
     TokenTelemetry,
@@ -52,6 +60,7 @@ def session(
 
 
 __all__ = [
+    "CANONICAL_SLOTS",
     "AgdbSession",
     "AgdbStore",
     "Breakpoint",
@@ -60,6 +69,7 @@ __all__ = [
     "OscillationAlert",
     "OscillationWatchdog",
     "SessionMetadata",
+    "SlotVerificationReport",
     "TokenTelemetry",
     "ToolInvocationRecord",
     "TurnContext",
@@ -68,9 +78,13 @@ __all__ = [
     "UnloopStore",
     "__version__",
     "agdb_trace",
+    "canonicalize_constraints_rfc8785",
+    "extract_hard_constraints",
     "get_current_session",
     "is_side_effect_tool_name",
+    "parse_compaction_slots",
     "session",
     "set_current_session",
     "trace",
+    "verify_compaction_checkpoint",
 ]

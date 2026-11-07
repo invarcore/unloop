@@ -143,7 +143,20 @@ def history(db_path: str, session_id: str | None, branch: str | None) -> None:
 @click.option("--to", "turn_b_idx", type=int, default=1, help="Second turn index to compare.")
 @click.option("--branch", default=None, help="Branch name (defaults to active branch).")
 @click.option("--prompt", "-p", is_flag=True, default=False, help="Display detailed prompt diff and compaction analysis.")
-def diff_turns(db_path: str, turn_a_idx: int, turn_b_idx: int, branch: str | None, prompt: bool) -> None:
+@click.option(
+    "--verify-slots",
+    is_flag=True,
+    default=False,
+    help="Enforce OpenClaw/Hermes 6-slot schema completeness and negative constraint survival.",
+)
+def diff_turns(
+    db_path: str,
+    turn_a_idx: int,
+    turn_b_idx: int,
+    branch: str | None,
+    prompt: bool,
+    verify_slots: bool = False,
+) -> None:
     """Compare state, tool executions, side-effects, and prompt diffs between two turns."""
     with UnloopStore(db_path) as store:
         cursor = store.conn.cursor()
@@ -256,6 +269,28 @@ def diff_turns(db_path: str, turn_a_idx: int, turn_b_idx: int, branch: str | Non
                         border_style="cyan",
                     )
                 )
+
+        if verify_slots:
+            from unloop.compaction_slots import verify_compaction_checkpoint
+
+            pre_prompt = turn_a.prompt or ""
+            post_prompt = turn_b.prompt or ""
+            report = verify_compaction_checkpoint(pre_prompt, post_prompt)
+            if not report.passed:
+                sys.stderr.write(
+                    f"[UNLOOP COMPACTION GATE FAILED] Digest: {report.canonical_constraints_digest[:12]}\n"
+                )
+                if report.missing_slots:
+                    sys.stderr.write(f"  Missing Slots:    {', '.join(report.missing_slots)}\n")
+                if report.dropped_anchors:
+                    sys.stderr.write(f"  Dropped Anchors:  {', '.join(report.dropped_anchors)}\n")
+                for dropped in report.dropped_constraints:
+                    sys.stderr.write(f"  Dropped Invariant: '{dropped}'\n")
+                sys.exit(2)
+
+            sys.stdout.write(
+                f"[UNLOOP COMPACTION GATE PASSED] RFC8785 Digest: {report.canonical_constraints_digest}\n"
+            )
 
 
 @cli.command("record", context_settings=dict(ignore_unknown_options=True))
