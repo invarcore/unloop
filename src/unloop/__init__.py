@@ -8,6 +8,16 @@ Break out of critique loops, rewind cognitive turns, and mutate state in-flight.
 
 from pathlib import Path
 
+from unloop.argshield import (
+    BANNED_FLAG_PREFIXES,
+    POSITIONAL_FLAG_PARAMS,
+    STRICT_PATH_KEYS,
+    ArgShieldPolicy,
+    ArgShieldViolationError,
+    sanitize_tool_arguments,
+    verify_no_flag_injection,
+    verify_path_in_jail,
+)
 from unloop.compaction_slots import (
     CANONICAL_SLOTS,
     SlotVerificationReport,
@@ -35,6 +45,15 @@ from unloop.runtime.interceptor import (
     trace,
 )
 from unloop.runtime.watchdog import OscillationAlert, OscillationWatchdog
+from unloop.semantic_watchdog import (
+    OscillationDetectedError,
+    SemanticOscillationWatchdog,
+    compute_semantic_turn_digest,
+)
+from unloop.stdio_recorder import (
+    StdioSessionRecorder,
+    run_stdio_proxy_session,
+)
 from unloop.storage.db import AgdbStore, UnloopStore
 
 __version__ = "0.2.0"
@@ -60,16 +79,24 @@ def session(
 
 
 __all__ = [
+    "BANNED_FLAG_PREFIXES",
     "CANONICAL_SLOTS",
+    "POSITIONAL_FLAG_PARAMS",
+    "STRICT_PATH_KEYS",
     "AgdbSession",
     "AgdbStore",
+    "ArgShieldPolicy",
+    "ArgShieldViolationError",
     "Breakpoint",
     "BreakpointHalt",
     "BreakpointManager",
     "OscillationAlert",
+    "OscillationDetectedError",
     "OscillationWatchdog",
+    "SemanticOscillationWatchdog",
     "SessionMetadata",
     "SlotVerificationReport",
+    "StdioSessionRecorder",
     "TokenTelemetry",
     "ToolInvocationRecord",
     "TurnContext",
@@ -79,12 +106,17 @@ __all__ = [
     "__version__",
     "agdb_trace",
     "canonicalize_constraints_rfc8785",
+    "compute_semantic_turn_digest",
     "extract_hard_constraints",
     "get_current_session",
     "is_side_effect_tool_name",
     "parse_compaction_slots",
+    "run_stdio_proxy_session",
+    "sanitize_tool_arguments",
     "session",
     "set_current_session",
     "trace",
     "verify_compaction_checkpoint",
+    "verify_no_flag_injection",
+    "verify_path_in_jail",
 ]
