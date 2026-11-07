@@ -10,6 +10,7 @@ Enforces strict path jailing via os.path.commonpath and targeted CLI flag inject
 from __future__ import annotations
 
 import os
+import sys
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
@@ -43,6 +44,12 @@ POSITIONAL_FLAG_PARAMS: frozenset[str] = frozenset({
     "commit",
 })
 
+WIN_DEVICE_NAMES: frozenset[str] = frozenset(
+    {"CON", "PRN", "AUX", "NUL"}
+    | {f"COM{i}" for i in range(1, 10)}
+    | {f"LPT{i}" for i in range(1, 10)}
+)
+
 
 class ArgShieldViolationError(ValueError):
     """Raised when a tool argument violates ArgShield security policies."""
@@ -64,6 +71,37 @@ class ArgShieldPolicy:
     positional_flag_param_names: frozenset[str] = POSITIONAL_FLAG_PARAMS
     disallow_null_bytes: bool = True
 
+    @classmethod
+    def from_tool_schema(
+        cls,
+        tools: list[dict[str, Any]],
+        jail_dir: Path | str | None = None,
+        base_policy: ArgShieldPolicy | None = None,
+    ) -> ArgShieldPolicy:
+        """Dynamically learn and enrich strict path keys from MCP tools/list schemas."""
+        inferred_keys = set(base_policy.strict_path_keys if base_policy else STRICT_PATH_KEYS)
+        for tool in tools:
+            schema = tool.get("inputSchema", {})
+            properties = schema.get("properties", {})
+            if isinstance(properties, dict):
+                for prop_name, prop_meta in properties.items():
+                    if isinstance(prop_meta, dict):
+                        prop_fmt = prop_meta.get("format", "").lower()
+                        desc = prop_meta.get("description", "").lower()
+                        if prop_fmt in ("path", "uri", "filepath") or any(
+                            kw in desc for kw in ("file path", "directory path", "filesystem path", "relative path")
+                        ):
+                            inferred_keys.add(prop_name.lower())
+        return cls(
+            jail_dir=jail_dir or (base_policy.jail_dir if base_policy else None),
+            strict_path_keys=frozenset(inferred_keys),
+            banned_flag_prefixes=base_policy.banned_flag_prefixes if base_policy else BANNED_FLAG_PREFIXES,
+            positional_flag_param_names=(
+                base_policy.positional_flag_param_names if base_policy else POSITIONAL_FLAG_PARAMS
+            ),
+            disallow_null_bytes=base_policy.disallow_null_bytes if base_policy else True,
+        )
+
 
 def verify_path_in_jail(
     raw_path: str | Path,
@@ -72,7 +110,8 @@ def verify_path_in_jail(
 ) -> Path:
     """Verify that raw_path resolves strictly within jail_dir.
 
-    Guards against path traversal, null byte injections, and prefix-sibling escapes.
+    Guards against path traversal, null byte injections, prefix-sibling escapes,
+    and Windows DOS device namespace hijacks (CON, PRN, AUX, NUL).
     Uses os.path.commonpath for strict boundary verification.
     """
     norm_raw = unicodedata.normalize("NFC", str(raw_path))
@@ -85,6 +124,17 @@ def verify_path_in_jail(
 
     jail_path = Path(jail_dir).resolve()
     target_path = (jail_path / norm_raw).resolve()
+
+    # Defend against Windows DOS reserved device names (CON, NUL, AUX, COM1-9, etc.)
+    if sys.platform == "win32" or os.name == "nt":
+        target_stem = target_path.stem.upper()
+        target_name = target_path.name.upper()
+        if target_stem in WIN_DEVICE_NAMES or target_name in WIN_DEVICE_NAMES:
+            raise ArgShieldViolationError(
+                field=field_name,
+                violation_type="device_name",
+                message=f"Path targets Windows reserved device name: {target_path.name}",
+            )
 
     try:
         common = os.path.commonpath([str(jail_path), str(target_path)])
@@ -113,7 +163,8 @@ def verify_no_flag_injection(
     """Verify that string parameter val does not contain forbidden CLI flags.
 
     Defends against CVE-2026-85626 (git option injection).
-    Only blocks leading dashes on banned prefixes or positional parameter roles.
+    Blocks banned flag prefixes in both equals-delimited (--flag=val) and
+    space-delimited (--flag val) formats, as well as leading dashes on positional parameters.
     """
     banned_prefixes = policy.banned_flag_prefixes if policy else BANNED_FLAG_PREFIXES
     positional_params = policy.positional_flag_param_names if policy else POSITIONAL_FLAG_PARAMS
@@ -121,7 +172,8 @@ def verify_no_flag_injection(
     val_norm = unicodedata.normalize("NFC", str(val))
     if val_norm.startswith("-"):
         for banned in banned_prefixes:
-            if val_norm.startswith(banned):
+            stem = banned.rstrip("=")
+            if val_norm == stem or val_norm.startswith(banned) or val_norm.startswith(stem + " "):
                 raise ArgShieldViolationError(
                     field=param_name,
                     violation_type="flag_injection",

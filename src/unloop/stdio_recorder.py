@@ -166,10 +166,26 @@ class StdioSessionRecorder:
     def intercept_server_line(self, line: str) -> str:
         """Intercept a server line output by child server.
 
-        Records the frame and feeds content into SemanticOscillationWatchdog.
+        Records the frame, feeds content into SemanticOscillationWatchdog,
+        and dynamically learns tool parameter schemas from tools/list responses.
         Raises OscillationDetectedError if cognitive oscillation is detected.
         """
         clean_line = line.strip("\r\n")
+
+        # Opportunistically learn tool schemas from tools/list responses
+        try:
+            data = json.loads(clean_line)
+            if isinstance(data, dict):
+                result = data.get("result")
+                if isinstance(result, dict) and "tools" in result and isinstance(result["tools"], list):
+                    self.argshield_policy = ArgShieldPolicy.from_tool_schema(
+                        tools=result["tools"],
+                        jail_dir=self.jail_dir,
+                        base_policy=self.argshield_policy,
+                    )
+        except Exception:
+            pass
+
         digest = self.watchdog.record_turn_content(clean_line)
         self.record_frame("SERVER_TO_CLIENT", clean_line, digest)
         return clean_line

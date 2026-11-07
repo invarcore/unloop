@@ -189,3 +189,4 @@ class SemanticOscillationWatchdog:
 
         self._digests.append(digest)
         return digest
+

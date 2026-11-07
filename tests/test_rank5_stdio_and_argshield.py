@@ -575,3 +575,128 @@ def test_run_stdio_proxy_session_timeout(tmp_path: Path) -> None:
         )
     assert "timed out" in str(exc_info.value)
 
+
+def test_verify_no_flag_injection_space_delimited() -> None:
+    """Enhanced P0: Flag injection defense blocks space-delimited and standalone flags."""
+    with pytest.raises(ArgShieldViolationError) as exc1:
+        verify_no_flag_injection("any_arg", "--output /tmp/evil")
+    assert exc1.value.violation_type == "flag_injection"
+
+    with pytest.raises(ArgShieldViolationError) as exc2:
+        verify_no_flag_injection("any_arg", "--output")
+    assert exc2.value.violation_type == "flag_injection"
+
+    with pytest.raises(ArgShieldViolationError) as exc3:
+        verify_no_flag_injection("any_arg", "--upload-pack cat /etc/passwd")
+    assert exc3.value.violation_type == "flag_injection"
+
+
+def test_verify_path_in_jail_windows_device_names(tmp_path: Path) -> None:
+    """Enhanced P1: Defense against Windows DOS reserved device names (CON, NUL, AUX, etc.)."""
+    jail = tmp_path / "jail"
+    jail.mkdir()
+
+    for dev_name in ("CON", "con.txt", "NUL", "nul.dat", "AUX", "COM1", "lpt1.log"):
+        with pytest.raises(ArgShieldViolationError) as exc_info:
+            verify_path_in_jail(dev_name, jail)
+        assert exc_info.value.violation_type == "device_name"
+        assert "reserved device name" in exc_info.value.message
+
+
+def test_argshield_policy_from_tool_schema(tmp_path: Path) -> None:
+    """Enhanced P2: Dynamic schema inference from MCP tools/list definitions."""
+    jail = tmp_path / "jail"
+    jail.mkdir()
+
+    tools_schema = [
+        {
+            "name": "custom_importer",
+            "description": "Imports data",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "source_archive": {
+                        "type": "string",
+                        "description": "The file path of the archive to extract",
+                    },
+                    "target_dest": {
+                        "type": "string",
+                        "format": "path",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "User description of import",
+                    },
+                },
+            },
+        }
+    ]
+
+    policy = ArgShieldPolicy.from_tool_schema(tools_schema, jail_dir=jail)
+    assert "source_archive" in policy.strict_path_keys
+    assert "target_dest" in policy.strict_path_keys
+    assert "description" not in policy.strict_path_keys
+
+    # Custom inferred keys are now properly jailed
+    bad_args = {"source_archive": "../outside.zip"}
+    with pytest.raises(ArgShieldViolationError) as exc_info:
+        sanitize_tool_arguments("custom_importer", bad_args, policy=policy)
+    assert exc_info.value.violation_type == "path_traversal"
+
+
+def test_stdio_recorder_dynamically_learns_tool_schema(tmp_path: Path) -> None:
+    """Verify StdioSessionRecorder wire-level learning of tool schemas from tools/list."""
+    jail = tmp_path / "jail"
+    jail.mkdir()
+    db_file = tmp_path / "schema_learn.sqlite"
+
+    recorder = StdioSessionRecorder(db_path=db_file, session_id="learn_sess", jail_dir=jail)
+
+    # 1. Server responds to tools/list with custom tool schema
+    tools_list_response = json.dumps({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+            "tools": [
+                {
+                    "name": "backup_repo",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "backup_dest": {
+                                "type": "string",
+                                "description": "The filesystem path for backup output",
+                            }
+                        },
+                    },
+                }
+            ]
+        },
+    })
+    recorder.intercept_server_line(tools_list_response)
+
+    # Verify that the policy on recorder now contains backup_dest!
+    assert "backup_dest" in recorder.argshield_policy.strict_path_keys
+
+    # 2. Next client request invokes backup_repo with path traversal in backup_dest
+    client_call = json.dumps({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/call",
+        "params": {
+            "name": "backup_repo",
+            "arguments": {
+                "backup_dest": "../../../etc/shadow",
+            },
+        },
+    })
+    _forward, err_str = recorder.intercept_client_line(client_call)
+    assert err_str is not None
+    err = json.loads(err_str)
+    assert err["error"]["code"] == -32602
+    assert err["error"]["data"]["field"] == "backup_dest"
+    assert err["error"]["data"]["violation"] == "path_traversal"
+
+    recorder.close()
+
+
