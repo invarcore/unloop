@@ -21,48 +21,49 @@ PRE_PROMPT = """
 System instructions:
 - Never modify files under `db/migrations/001_init.sql` or `src/auth/middleware.py`.
 - Do not pass `--force` or `--no-verify` to git commands.
-- Read-only access to `/etc/hosts`.
+- Treat `config/prod.yaml` as read\u2013only.
 """
 
 VALID_6_SLOT_SUMMARY = """
-## Goal
+### Goal
 Refactor the user profile endpoint latency.
 
-## Constraints and Preferences
+### Constraints and Preferences
 - Never modify files under `db/migrations/001_init.sql` or `src/auth/middleware.py`.
 - Do not pass `--force` or `--no-verify` to git commands.
+- Treat `config/prod.yaml` as read-only.
 
-## Progress
+### Progress
 Profiled SQL queries in `src/users/repo.py`.
 
-## Key Decisions
+### Key Decisions
 Use composite index on `(tenant_id, created_at)`.
 
-## Next Steps
+### Next Steps
 Run `pytest tests/test_users.py`.
 
-## Critical Context
-Tenant RLS role `kf_app` must remain active. Read-only access to `/etc/hosts` preserved.
+### Critical Context
+Tenant RLS role `kf_app` must remain active.
 """
 
 DRIFTED_6_SLOT_SUMMARY = """
-## Goal
+### Goal
 Refactor the user profile endpoint latency.
 
-## Constraints and Preferences
+### Constraints and Preferences
 - Follow standard git best practices and avoid touching database files if possible.
 
-## Progress
+### Progress
 Profiled SQL queries in `src/users/repo.py`.
 
-## Key Decisions
+### Key Decisions
 Use composite index.
 
-## Next Steps
+### Next Steps
 Run tests.
 
-## Critical Context
-Tenant RLS role `kf_app` must remain active.
+### Critical Context
+None.
 """
 
 
@@ -102,7 +103,8 @@ def test_fails_closed_when_speccompact_drops_negative_constraints():
     assert report.passed is False
     assert "db/migrations/001_init.sql" in report.dropped_anchors
     assert "--no-verify" in report.dropped_anchors
-    assert len(report.dropped_constraints) >= 2
+    assert "config/prod.yaml" in report.dropped_anchors
+    assert len(report.dropped_constraints) == 3
 
 
 def test_detects_missing_openclaw_schema_slots():

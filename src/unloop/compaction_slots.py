@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
@@ -30,14 +31,16 @@ _SLOT_HEADER_RE = re.compile(
     re.IGNORECASE | re.MULTILINE,
 )
 
+# Flash Guardrail: Include ASCII hyphen (-), en-dash (\u2013), and em-dash (\u2014) in read-only/negative patterns
 _NEGATIVE_INVARIANT_RE = re.compile(
-    r"\b(?:never|do\s+not|don't|must\s+not|cannot|can't|forbid(?:den)?|prohibit(?:ed)?|"
-    r"strictly\s+avoid|read-only|immutable)\b",
+    r"\b(?:never|do\s+not|don['\u2019]t|must\s+not|cannot|can['\u2019]t|forbid(?:den)?|"
+    r"prohibit(?:ed)?|strictly\s+avoid|read[\-\u2013\u2014]only|immutable)\b",
     re.IGNORECASE,
 )
 
+# Captures backticked literals, CLI flags (--flag), or POSIX/Windows relative paths
 _ANCHOR_TOKEN_RE = re.compile(
-    r"`([^`]+)`|((?:--?[a-zA-Z0-9_-]+)|(?:\b[a-zA-Z0-9_.-]+/[a-zA-Z0-9_./-]+))"
+    r"`([^`]+)`|((?:--?[a-zA-Z0-9][\w\-]*)|(?:\b[a-zA-Z0-9_.\-]+(?:/[a-zA-Z0-9_.\-]+)+))"
 )
 
 
@@ -52,8 +55,9 @@ class SlotVerificationReport:
 
 
 def parse_compaction_slots(markdown_text: str) -> dict[str, str]:
-    """Parse an OpenClaw / Hermes 6-slot compaction checkpoint into a canonical dictionary."""
-    matches = list(_SLOT_HEADER_RE.finditer(markdown_text))
+    """Parse an OpenClaw / Hermes 6-slot compaction checkpoint into a canonical map."""
+    normalized_text = unicodedata.normalize("NFC", markdown_text)
+    matches = list(_SLOT_HEADER_RE.finditer(normalized_text))
     parsed: dict[str, str] = {}
     canonical_lookup = {s.lower(): s for s in CANONICAL_SLOTS}
 
@@ -61,24 +65,25 @@ def parse_compaction_slots(markdown_text: str) -> dict[str, str]:
         raw_name = match.group(1).strip().lower()
         slot_name = canonical_lookup[raw_name]
         start = match.end()
-        end = matches[idx + 1].start() if idx + 1 < len(matches) else len(markdown_text)
-        parsed[slot_name] = markdown_text[start:end].strip()
+        end = matches[idx + 1].start() if idx + 1 < len(matches) else len(normalized_text)
+        parsed[slot_name] = normalized_text[start:end].strip()
 
     return parsed
 
 
 def extract_hard_constraints(text: str) -> tuple[list[str], set[str]]:
-    """Extract normalized negative constraint clauses and code/path anchor tokens."""
+    """Extract normalized negative constraint clauses and their technical anchor tokens."""
+    normalized_text = unicodedata.normalize("NFC", text)
     clauses: list[str] = []
     anchors: set[str] = set()
 
-    for raw_line in text.splitlines():
-        line = re.sub(r"^[\s*\-•\d.)]+", "", raw_line).strip()
+    for raw_line in normalized_text.splitlines():
+        line = re.sub(r"^[\s*\-\u2022\u2013\u2014\d.)]+", "", raw_line).strip()
         if not line:
             continue
         if _NEGATIVE_INVARIANT_RE.search(line):
-            normalized = re.sub(r"\s+", " ", line.lower()).rstrip(".")
-            clauses.append(normalized)
+            normalized_clause = re.sub(r"\s+", " ", line.lower()).rstrip(".")
+            clauses.append(normalized_clause)
             for m in _ANCHOR_TOKEN_RE.finditer(line):
                 token = (m.group(1) or m.group(2) or "").strip()
                 if token:
@@ -88,10 +93,10 @@ def extract_hard_constraints(text: str) -> tuple[list[str], set[str]]:
 
 
 def canonicalize_constraints_rfc8785(clauses: Sequence[str], anchors: set[str]) -> str:
-    """Compute an RFC 8785 deterministic SHA-256 digest of the constraint lattice."""
+    """Compute an RFC 8785 deterministic SHA-256 digest of the active constraint lattice."""
     payload = {
-        "anchors": sorted(anchors),
-        "clauses": sorted(set(clauses)),
+        "anchors": sorted(unicodedata.normalize("NFC", a) for a in anchors),
+        "clauses": sorted(set(unicodedata.normalize("NFC", c) for c in clauses)),
         "schema": "openclaw-6slot-v1",
     }
     canonical_bytes = json.dumps(
@@ -105,7 +110,7 @@ def verify_compaction_checkpoint(
     post_compaction_text: str,
     require_all_slots: bool = True,
 ) -> SlotVerificationReport:
-    """Deterministically verify that an OpenClaw/Hermes compaction summary preserves constraints.
+    """Deterministically verify that a 6-slot OpenClaw/Hermes compaction summary preserves constraints.
 
     Preserves all hard negative constraints and technical anchors (<2ms runtime).
     """
@@ -120,16 +125,22 @@ def verify_compaction_checkpoint(
     pre_constraint_source = pre_slots.get(
         "Constraints and Preferences", pre_compaction_text
     )
-    post_constraint_source = post_slots.get(
-        "Constraints and Preferences", ""
-    ) + "\n" + post_slots.get("Critical Context", "")
+    post_constraint_source = (
+        post_slots.get("Constraints and Preferences", "")
+        + "\n"
+        + post_slots.get("Critical Context", "")
+    )
 
     pre_clauses, pre_anchors = extract_hard_constraints(pre_constraint_source)
     post_clauses, post_anchors = extract_hard_constraints(post_constraint_source)
 
     post_text_lower = post_constraint_source.lower()
     dropped_anchors = tuple(
-        sorted(a for a in pre_anchors if a not in post_anchors and a.lower() not in post_text_lower)
+        sorted(
+            a
+            for a in pre_anchors
+            if a not in post_anchors and a.lower() not in post_text_lower
+        )
     )
 
     post_clause_set = set(post_clauses)
