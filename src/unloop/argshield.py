@@ -10,7 +10,6 @@ Enforces strict path jailing via os.path.commonpath and targeted CLI flag inject
 from __future__ import annotations
 
 import os
-import sys
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
@@ -125,16 +124,15 @@ def verify_path_in_jail(
     jail_path = Path(jail_dir).resolve()
     target_path = (jail_path / norm_raw).resolve()
 
-    # Defend against Windows DOS reserved device names (CON, NUL, AUX, COM1-9, etc.)
-    if sys.platform == "win32" or os.name == "nt":
-        target_stem = target_path.stem.upper()
-        target_name = target_path.name.upper()
-        if target_stem in WIN_DEVICE_NAMES or target_name in WIN_DEVICE_NAMES:
-            raise ArgShieldViolationError(
-                field=field_name,
-                violation_type="device_name",
-                message=f"Path targets Windows reserved device name: {target_path.name}",
-            )
+    # Defend against Windows DOS reserved device names (CON, NUL, AUX, COM1-9, etc.) across all platforms
+    target_stem = target_path.stem.upper()
+    target_name = target_path.name.upper()
+    if target_stem in WIN_DEVICE_NAMES or target_name in WIN_DEVICE_NAMES:
+        raise ArgShieldViolationError(
+            field=field_name,
+            violation_type="device_name",
+            message=f"Path targets Windows reserved device name: {target_path.name}",
+        )
 
     try:
         common = os.path.commonpath([str(jail_path), str(target_path)])
