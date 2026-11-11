@@ -10,10 +10,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+import posixpath
 import re
 import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from typing import Any
+from urllib.parse import unquote
 
 CANONICAL_SLOTS: tuple[str, ...] = (
     "Goal",
@@ -116,15 +120,11 @@ def verify_compaction_checkpoint(
     """
     post_slots = parse_compaction_slots(post_compaction_text)
     missing_slots = (
-        tuple(s for s in CANONICAL_SLOTS if s not in post_slots)
-        if require_all_slots
-        else ()
+        tuple(s for s in CANONICAL_SLOTS if s not in post_slots) if require_all_slots else ()
     )
 
     pre_slots = parse_compaction_slots(pre_compaction_text)
-    pre_constraint_source = pre_slots.get(
-        "Constraints and Preferences", pre_compaction_text
-    )
+    pre_constraint_source = pre_slots.get("Constraints and Preferences", pre_compaction_text)
     post_constraint_source = (
         post_slots.get("Constraints and Preferences", "")
         + "\n"
@@ -136,11 +136,7 @@ def verify_compaction_checkpoint(
 
     post_text_lower = post_constraint_source.lower()
     dropped_anchors = tuple(
-        sorted(
-            a
-            for a in pre_anchors
-            if a not in post_anchors and a.lower() not in post_text_lower
-        )
+        sorted(a for a in pre_anchors if a not in post_anchors and a.lower() not in post_text_lower)
     )
 
     post_clause_set = set(post_clauses)
@@ -156,11 +152,7 @@ def verify_compaction_checkpoint(
                 dropped_constraints.append(clause)
 
     digest = canonicalize_constraints_rfc8785(post_clauses, post_anchors)
-    passed = (
-        len(missing_slots) == 0
-        and len(dropped_constraints) == 0
-        and len(dropped_anchors) == 0
-    )
+    passed = len(missing_slots) == 0 and len(dropped_constraints) == 0 and len(dropped_anchors) == 0
 
     return SlotVerificationReport(
         passed=passed,
@@ -170,3 +162,97 @@ def verify_compaction_checkpoint(
         canonical_constraints_digest=digest,
         slot_map=post_slots,
     )
+
+
+_DRIVE_RE = re.compile(r"^([A-Za-z]:)(/.*)?$")
+
+
+def _normalize_arcbench_path(raw: str) -> str:
+    decoded = unquote(raw)
+    has_bs = chr(92) in raw or chr(92) in decoded
+    forward = decoded.replace(chr(92), "/").strip()
+    is_drive = bool(_DRIVE_RE.match(forward))
+    collapsed = re.sub(r"/+", "/", forward)
+    norm = posixpath.normpath(collapsed) if collapsed else ""
+    if collapsed.startswith("/") and not norm.startswith("/"):
+        norm = "/" + norm.lstrip("/")
+    if norm == "." and not raw.strip().startswith("."):
+        norm = ""
+    if len(norm) > 1 and norm.endswith("/") and not _DRIVE_RE.match(norm):
+        norm = norm.rstrip("/")
+    if norm.endswith(":"):
+        norm = norm + "/"
+    return norm.casefold() if (is_drive or has_bs) else norm
+
+
+def _normalize_jcs(obj: Any) -> Any:
+    if isinstance(obj, str):
+        return unicodedata.normalize("NFC", obj)
+    if isinstance(obj, bool):
+        return obj
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            raise ValueError("RFC 8785 canonical JSON cannot encode NaN or Infinity.")
+        if obj == 0.0:
+            return 0
+        if obj.is_integer():
+            return int(obj)
+        return obj
+    if isinstance(obj, Mapping):
+        return {unicodedata.normalize("NFC", str(k)): _normalize_jcs(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_normalize_jcs(x) for x in obj]
+    return obj
+
+
+def export_arcbench_lock_sidecar(
+    compaction_epoch: int,
+    post_compaction_text: str = "",
+    *,
+    allowed_tools: Sequence[str] = (),
+    forbidden_tools: Sequence[str] = (),
+    forbidden_path_prefixes: Sequence[str] = (),
+    pinned_arg_literals: Mapping[str, Mapping[str, Any]] | None = None,
+    pinned_model_version: str | None = None,
+    extract_path_anchors: bool = True,
+) -> dict[str, Any]:
+    """Export an RFC 8785 @arcbench_lock:sha256 sidecar dictionary for intent-fabric."""
+    extracted_paths: list[str] = list(forbidden_path_prefixes)
+    if extract_path_anchors and post_compaction_text:
+        slots = parse_compaction_slots(post_compaction_text)
+        source = (
+            slots.get("Constraints and Preferences", "") + "\n" + slots.get("Critical Context", "")
+        ).strip() or post_compaction_text
+        _, anchors = extract_hard_constraints(source)
+        for anchor in sorted(anchors):
+            if "/" in anchor or chr(92) in anchor:
+                extracted_paths.append(anchor)
+
+    norm_allowed = sorted(set(allowed_tools))
+    norm_tools = sorted(set(forbidden_tools))
+    norm_paths = sorted({_normalize_arcbench_path(p) for p in extracted_paths if p})
+    norm_args = (
+        {str(k): dict(sorted(v.items())) for k, v in sorted(pinned_arg_literals.items())}
+        if pinned_arg_literals
+        else {}
+    )
+    payload = {
+        "allowed_tools": norm_allowed,
+        "compaction_epoch": compaction_epoch,
+        "forbidden_path_prefixes": norm_paths,
+        "forbidden_tools": norm_tools,
+        "pinned_arg_literals": norm_args,
+        "pinned_model_version": pinned_model_version,
+    }
+    canonical = json.dumps(
+        _normalize_jcs(payload),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    digest = "@arcbench_lock:sha256:" + hashlib.sha256(canonical).hexdigest()
+    return {
+        "schema_version": "arcbench-lock-v1",
+        **payload,
+        "lock_digest": digest,
+    }

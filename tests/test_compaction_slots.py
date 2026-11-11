@@ -12,6 +12,7 @@ import unloop
 from unloop.cli.main import cli
 from unloop.compaction_slots import (
     canonicalize_constraints_rfc8785,
+    export_arcbench_lock_sidecar,
     extract_hard_constraints,
     parse_compaction_slots,
     verify_compaction_checkpoint,
@@ -203,4 +204,37 @@ def test_cli_diff_verify_slots_failed():
         )
         assert res.exit_code == 2
         assert "[UNLOOP COMPACTION GATE FAILED]" in res.output
-        assert "Missing Slots:" in res.output or "Dropped Anchors:" in res.output or "Dropped Invariant:" in res.output
+        assert (
+            "Missing Slots:" in res.output
+            or "Dropped Anchors:" in res.output
+            or "Dropped Invariant:" in res.output
+        )
+
+
+def test_export_arcbench_lock_sidecar():
+    sidecar = export_arcbench_lock_sidecar(
+        compaction_epoch=3,
+        post_compaction_text=VALID_6_SLOT_SUMMARY,
+        forbidden_tools=["drop_db"],
+        pinned_arg_literals={"deploy": {"dry_run": True}},
+        pinned_model_version="gemini-2.5-pro-002",
+    )
+    assert sidecar["schema_version"] == "arcbench-lock-v1"
+    assert sidecar["lock_digest"].startswith("@arcbench_lock:sha256:")
+    assert "db/migrations/001_init.sql" in sidecar["forbidden_path_prefixes"]
+    assert "config/prod.yaml" in sidecar["forbidden_path_prefixes"]
+    assert "src/auth/middleware.py" in sidecar["forbidden_path_prefixes"]
+    assert sidecar["forbidden_tools"] == ["drop_db"]
+    assert sidecar["allowed_tools"] == []
+    assert sidecar["pinned_model_version"] == "gemini-2.5-pro-002"
+
+
+def test_export_arcbench_lock_sidecar_with_allowed_tools():
+    sidecar = export_arcbench_lock_sidecar(
+        compaction_epoch=4,
+        post_compaction_text=VALID_6_SLOT_SUMMARY,
+        allowed_tools=["deploy", "read_file"],
+        forbidden_tools=["drop_db"],
+    )
+    assert sidecar["allowed_tools"] == ["deploy", "read_file"]
+    assert sidecar["lock_digest"].startswith("@arcbench_lock:sha256:")

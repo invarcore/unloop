@@ -122,10 +122,11 @@ with unloop.session("research_assistant", db_path="run.unloop") as dbg:
 
 ---
 
-### 4. Prompt Compaction Diffing (`unloop diff --prompt`)
+### 4. Prompt Compaction Diffing (`unloop diff --prompt`) & ARCBench Lock Sidecars
 Context compression and prompt compaction are notorious for silently dropping negative constraints, schema rules, and critical facts:
 - **Raw Prompt Preservation**: Every turn snapshot captures the full model input prompt, message sequence, and token telemetry.
-- **Silent Drop Detection**: Run `unloop diff session.unloop --from 2 --to 3 --prompt` to compare pre- and post-compaction prompts.
+- **Silent Drop Detection**: Run `unloop diff session.unloop --from 2 --to 3 --prompt` (or `--verify-slots`) to compare pre- and post-compaction prompts against the 6-slot OpenClaw/SpecCompact schema (`verify_compaction_checkpoint`).
+- **ARCBench Sidecar Export (`export_arcbench_lock_sidecar`)**: Compiles surviving negative constraints, `allowed_tools`, `forbidden_tools`, normalized `forbidden_path_prefixes`, `pinned_arg_literals`, and `pinned_model_version` into a deterministic `@arcbench_lock:sha256:...` sidecar consumed directly by `intent-fabric`.
 - **Line-by-Line Diff**: Highlights pruned constraints (in red `-`), newly introduced summaries (in green `+`), and overall compression ratio.
 
 ---
