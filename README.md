@@ -177,6 +177,24 @@ When a CI agent fails:
 
 ---
 
+### 7. Isolated Git Worktree CoW Jail (`unloop jail`)
+Run autonomous coding agents in isolated Copy-on-Write (CoW) Git worktree sandboxes with zero repository sprawl:
+
+```bash
+# Execute coding agent inside detached worktree jail
+unloop jail --agent-id agent-worker-1 -- uv run pytest
+
+# Keep jail intact for manual inspection
+unloop jail --agent-id agent-worker-1 --keep -- npm test
+```
+
+- **Ephemeral Worktree Sandboxing**: Spawns a detached Git worktree per agent (`.unloop/jails/<agent-id>`), preventing working tree collisions across parallel agent runs.
+- **Cross-Process Directory Locks**: Atomic filesystem locks arbitrate simultaneous worktree creation and cleanup with stale lock recovery.
+- **Unified Diff & Digest Export**: Automatically stages changes (`git add -N .`), exports unified diffs, and computes canonical SHA-256 patch digests for downstream verification.
+- **Clean Teardown**: Worktrees and jail directories are safely pruned on process exit unless `--keep` is explicitly set.
+
+---
+
 ## 🖥️ Terminal TUI Interface
 
 ```text
