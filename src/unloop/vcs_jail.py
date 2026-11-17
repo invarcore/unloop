@@ -157,8 +157,16 @@ class VCSJailCoordinator:
             cwd=str(jail_path),
             capture_output=True,
             text=True,
-            check=True,
+            check=False,
         )
+        if res.returncode != 0:
+            res = subprocess.run(
+                ["git", "diff"],
+                cwd=str(jail_path),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
         patch_text = res.stdout
         digest = hashlib.sha256(patch_text.encode("utf-8")).hexdigest()
         return patch_text, digest

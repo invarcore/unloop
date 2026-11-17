@@ -514,6 +514,10 @@ def replay(db_path: str) -> None:
 @click.argument("command", nargs=-1, type=click.UNPROCESSED)
 def jail_cmd(agent_id: str, repo: str, base_ref: str, keep: bool, command: tuple[str, ...]) -> None:
     """Execute commands in an isolated Copy-on-Write git worktree jail."""
+    if not command and not keep:
+        console.print("[red]Error: unloop jail requires either a command to execute or the --keep flag.[/red]")
+        sys.exit(1)
+
     from unloop.vcs_jail import VCSJailCoordinator
 
     coordinator = VCSJailCoordinator(repo_dir=repo)

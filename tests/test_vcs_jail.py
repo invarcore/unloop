@@ -217,6 +217,20 @@ def test_unloop_jail_cli_subcommand(git_repo: Path) -> None:
     assert kept_jail.exists()
     shutil.rmtree(kept_jail, ignore_errors=True)
 
+    # Missing both command and --keep fails with code 1
+    result_missing = runner.invoke(
+        cli,
+        [
+            "jail",
+            "--agent-id",
+            "cli-agent-no-cmd",
+            "--repo",
+            str(git_repo),
+        ],
+    )
+    assert result_missing.exit_code == 1
+    assert "requires either a command to execute or the --keep flag" in result_missing.output
+
 
 def test_coverage_boosters_compaction_slots() -> None:
     # JCS float normalization coverage
