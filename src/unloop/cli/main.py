@@ -504,3 +504,36 @@ def replay(db_path: str) -> None:
     from unloop.tui.app import run_tui
 
     run_tui(db_path)
+
+
+@cli.command("jail", context_settings={"ignore_unknown_options": True})
+@click.option("--agent-id", required=True, help="Unique identifier for the agent jail.")
+@click.option("--repo", default=".", help="Target Git repository root.")
+@click.option("--base-ref", default="HEAD", help="Base Git revision to detach from.")
+@click.option("--keep", is_flag=True, help="Keep the worktree jail on exit rather than destroying it.")
+@click.argument("command", nargs=-1, type=click.UNPROCESSED)
+def jail_cmd(agent_id: str, repo: str, base_ref: str, keep: bool, command: tuple[str, ...]) -> None:
+    """Execute commands in an isolated Copy-on-Write git worktree jail."""
+    from unloop.vcs_jail import VCSJailCoordinator
+
+    coordinator = VCSJailCoordinator(repo_dir=repo)
+    jail_path = coordinator.create_jail(agent_id, base_ref=base_ref)
+    console.print(f"[bold green]VCS Jail created for agent '{agent_id}' at[/bold green] {jail_path}")
+
+    try:
+        if command:
+            res = coordinator.run_in_jail(agent_id, command)
+            if res.stdout:
+                sys.stdout.write(res.stdout)
+            if res.stderr:
+                sys.stderr.write(res.stderr)
+            patch, digest = coordinator.export_patch_and_digest(agent_id)
+            if patch:
+                console.print(f"\n[cyan]Captured Unified Diff Digest[/cyan]: [bold]{digest[:16]}[/bold]")
+            if res.returncode != 0:
+                sys.exit(res.returncode)
+    finally:
+        if not keep:
+            coordinator.destroy_jail(agent_id)
+            console.print(f"[dim]VCS Jail for '{agent_id}' destroyed.[/dim]")
+

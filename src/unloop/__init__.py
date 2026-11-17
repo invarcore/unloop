@@ -57,6 +57,10 @@ from unloop.stdio_recorder import (
     run_stdio_proxy_session,
 )
 from unloop.storage.db import AgdbStore, UnloopStore
+from unloop.vcs_jail import (
+    JailMetadata,
+    VCSJailCoordinator,
+)
 
 __version__ = "0.2.0"
 
@@ -93,6 +97,7 @@ __all__ = [
     "Breakpoint",
     "BreakpointHalt",
     "BreakpointManager",
+    "JailMetadata",
     "OscillationAlert",
     "OscillationDetectedError",
     "OscillationWatchdog",
@@ -106,6 +111,7 @@ __all__ = [
     "TurnSnapshot",
     "UnloopSession",
     "UnloopStore",
+    "VCSJailCoordinator",
     "__version__",
     "agdb_trace",
     "canonicalize_constraints_rfc8785",
