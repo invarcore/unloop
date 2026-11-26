@@ -34,6 +34,9 @@ jobs:
       - name: Run ruff linter
         run: uv run ruff check .
 
+      - name: Verify README Claims (TRUTH-01, TRUTH-03, TRUTH-04)
+        run: uv run python scripts/verify_readme_claims.py --offline
+
       - name: Run pytest test suite with coverage enforcement (>=90%)
         run: uv run pytest -v --cov=unloop --cov-report=term-missing --cov-fail-under=90
 

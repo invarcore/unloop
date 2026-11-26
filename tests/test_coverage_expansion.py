@@ -69,7 +69,9 @@ def test_breakpoints_exhaustive() -> None:
     turn_tool_err = TurnSnapshot(
         session_id="s1",
         turn_index=0,
-        tool_invocations=[ToolInvocationRecord(tool_name="calc", arguments={}, error="ZeroDivisionError")],
+        tool_invocations=[
+            ToolInvocationRecord(tool_name="calc", arguments={}, error="ZeroDivisionError")
+        ],
     )
     hit, reason = mgr.check(turn_tool_err)
     assert hit is True
@@ -380,4 +382,3 @@ def test_additional_coverage_boosters(tmp_path: Path) -> None:
         loaded = store.get_history("enc_s")
         assert len(loaded) == 1
         assert loaded[0].state_delta == {"secret": "value"}
-

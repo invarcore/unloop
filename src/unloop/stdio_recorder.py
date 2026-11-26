@@ -177,7 +177,11 @@ class StdioSessionRecorder:
             data = json.loads(clean_line)
             if isinstance(data, dict):
                 result = data.get("result")
-                if isinstance(result, dict) and "tools" in result and isinstance(result["tools"], list):
+                if (
+                    isinstance(result, dict)
+                    and "tools" in result
+                    and isinstance(result["tools"], list)
+                ):
                     self.argshield_policy = ArgShieldPolicy.from_tool_schema(
                         tools=result["tools"],
                         jail_dir=self.jail_dir,

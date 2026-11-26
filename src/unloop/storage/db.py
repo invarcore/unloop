@@ -69,7 +69,8 @@ def redact_sensitive_dict(d: dict[str, Any]) -> dict[str, Any]:
             out[k] = redact_sensitive_dict(v)
         elif isinstance(v, list):
             out[k] = [
-                redact_sensitive_dict(item) if isinstance(item, dict)
+                redact_sensitive_dict(item)
+                if isinstance(item, dict)
                 else (redact_sensitive_text(item) if isinstance(item, str) else item)
                 for item in v
             ]
@@ -270,8 +271,7 @@ class UnloopStore:
             response = redact_sensitive_text(response)
             if messages:
                 messages = [
-                    redact_sensitive_dict(m) if isinstance(m, dict) else m
-                    for m in messages
+                    redact_sensitive_dict(m) if isinstance(m, dict) else m for m in messages
                 ]
             if state:
                 state = redact_sensitive_dict(state)
@@ -354,9 +354,7 @@ class UnloopStore:
 
     def get_turn(self, turn_id: str) -> TurnSnapshot | None:
         """Fetch a specific turn snapshot by turn_id."""
-        row = self.conn.execute(
-            "SELECT * FROM turns WHERE turn_id = ?", (turn_id,)
-        ).fetchone()
+        row = self.conn.execute("SELECT * FROM turns WHERE turn_id = ?", (turn_id,)).fetchone()
         if not row:
             return None
         return self._row_to_turn(row)

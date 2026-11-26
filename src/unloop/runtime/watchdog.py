@@ -39,7 +39,9 @@ class OscillationWatchdog:
         self.window_size = window_size
         self.detect_state_cycles = detect_state_cycles
 
-        self._tool_history: deque[tuple[str, str]] = deque(maxlen=window_size)  # (tool_name, arg_hash)
+        self._tool_history: deque[tuple[str, str]] = deque(
+            maxlen=window_size
+        )  # (tool_name, arg_hash)
         self._state_hashes: deque[str] = deque(maxlen=window_size)
 
     def record_turn(self, turn: TurnSnapshot) -> OscillationAlert | None:
@@ -71,7 +73,7 @@ class OscillationWatchdog:
 
         # A. Check identical consecutive tool calls
         if len(self._tool_history) >= self.max_consecutive_tools:
-            tail = list(self._tool_history)[-self.max_consecutive_tools:]
+            tail = list(self._tool_history)[-self.max_consecutive_tools :]
             if all(item == entry for item in tail):
                 return OscillationAlert(
                     alert_type="REPETITIVE_TOOL",

@@ -52,23 +52,34 @@ def run_local_hermetic_smoke_test() -> bool:
         t_trace_start = time.perf_counter()
         with unloop.session("autonomous_analyst", db_path=db_path) as dbg:
             # Turn 0: User query & query planning
-            with dbg.step(prompt="Analyze database migration risks", state={"risk_level": "unknown", "counter": 0}) as s0:
+            with dbg.step(
+                prompt="Analyze database migration risks",
+                state={"risk_level": "unknown", "counter": 0},
+            ) as s0:
                 s0.record_tool("schema_inspect", arguments={"table": "users"}, result="1.2M rows")
                 s0.set_telemetry(prompt_tokens=180, completion_tokens=45, cost_usd=0.001)
                 s0.set_response("Schema inspection complete. Now checking lock contention.")
 
             # Turn 1: Second tool call
-            with dbg.step(prompt="Checking lock contention", state={"risk_level": "moderate", "counter": 1}) as s1:
-                s1.record_tool("lock_analysis", arguments={"mode": "exclusive"}, result="High lock risk")
+            with dbg.step(
+                prompt="Checking lock contention", state={"risk_level": "moderate", "counter": 1}
+            ) as s1:
+                s1.record_tool(
+                    "lock_analysis", arguments={"mode": "exclusive"}, result="High lock risk"
+                )
                 s1.set_telemetry(prompt_tokens=240, completion_tokens=60, cost_usd=0.002)
                 s1.set_response("Lock contention requires batching.")
                 turn_1_id = s1.snapshot.turn_id
 
             # Turn 2: Runaway loop attempt - repetitive tool calls
             print("\n[Step 2] Simulating Runaway Critique Loop & Testing Watchdog Tripwire...")
-            with dbg.step(prompt="Retrying lock analysis", state={"risk_level": "high", "counter": 2}) as s2:
+            with dbg.step(
+                prompt="Retrying lock analysis", state={"risk_level": "high", "counter": 2}
+            ) as s2:
                 # Repeatedly calling same tool with same arguments triggers repetitive tool detector
-                s2.record_tool("lock_analysis", arguments={"mode": "exclusive"}, result="High lock risk")
+                s2.record_tool(
+                    "lock_analysis", arguments={"mode": "exclusive"}, result="High lock risk"
+                )
                 s2.set_telemetry(prompt_tokens=290, completion_tokens=30, cost_usd=0.001)
 
             session_id = dbg.session_id
@@ -84,7 +95,9 @@ def run_local_hermetic_smoke_test() -> bool:
             assert len(history) == 3, f"Expected 3 turns, got {len(history)}"
             print(f"   📜 History turns verified: {len(history)} turns on 'main'")
             for t in history:
-                print(f"      • Turn #{t.turn_index}: {t.prompt[:35]}... (tools: {len(t.tool_invocations)})")
+                print(
+                    f"      • Turn #{t.turn_index}: {t.prompt[:35]}... (tools: {len(t.tool_invocations)})"
+                )
 
             # 3. Time-Travel Rewind & Forking Branch
             print("\n[Step 4] Time-Travel Rewind & Forking Exploratory Branch...")
@@ -152,13 +165,23 @@ def run_openrouter_smoke_test(model: str = "openrouter/free") -> bool:
         t0 = time.perf_counter()
 
         with unloop.session("openrouter_live_agent", db_path=db_path) as dbg:
-            with dbg.step(prompt="List three key principles of robust AI agent design", state={"step": "generation"}) as s:
+            with dbg.step(
+                prompt="List three key principles of robust AI agent design",
+                state={"step": "generation"},
+            ) as s:
                 req = urllib.request.Request(
                     "https://openrouter.ai/api/v1/chat/completions",
-                    data=json.dumps({
-                        "model": model,
-                        "messages": [{"role": "user", "content": "List three key principles of robust AI agent design in one paragraph."}],
-                    }).encode("utf-8"),
+                    data=json.dumps(
+                        {
+                            "model": model,
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": "List three key principles of robust AI agent design in one paragraph.",
+                                }
+                            ],
+                        }
+                    ).encode("utf-8"),
                     headers={
                         "Authorization": f"Bearer {api_key}",
                         "Content-Type": "application/json",
@@ -174,7 +197,9 @@ def run_openrouter_smoke_test(model: str = "openrouter/free") -> bool:
                             completion_tokens=usage.get("completion_tokens", 80),
                         )
                         s.set_response(content)
-                        s.record_tool("openrouter_stream", arguments={"model": model}, result="200 OK")
+                        s.record_tool(
+                            "openrouter_stream", arguments={"model": model}, result="200 OK"
+                        )
                         elapsed = (time.perf_counter() - t0) * 1000
                         print(f"   ⏱️  API Latency: {elapsed:.2f}ms")
                         print(f"   💬 Response Preview: {content[:90]}...")

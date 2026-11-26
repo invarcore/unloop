@@ -18,15 +18,21 @@ def test_session_tracing_and_breakpoints() -> None:
             dbg.add_breakpoint(on_error=True)
 
             # Turn 1: normal execution
-            with dbg.step(prompt="Analyze system logs", state={"status": "init", "count": 10}) as step:
-                step.record_tool("fetch_logs", arguments={"service": "auth"}, result="OK", duration_ms=12.5)
+            with dbg.step(
+                prompt="Analyze system logs", state={"status": "init", "count": 10}
+            ) as step:
+                step.record_tool(
+                    "fetch_logs", arguments={"service": "auth"}, result="OK", duration_ms=12.5
+                )
                 step.set_response("Logs retrieved cleanly.")
                 step.set_telemetry(prompt_tokens=100, completion_tokens=50, cost_usd=0.001)
 
             # Turn 2: triggers breakpoint on error
             with pytest.raises(BreakpointHalt) as exc_info:
                 with dbg.step(prompt="Step 2", state={"status": "querying", "count": 15}) as step:
-                    step.record_tool("remote_api", arguments={"url": "http://bad"}, error="404 Not Found")
+                    step.record_tool(
+                        "remote_api", arguments={"url": "http://bad"}, error="404 Not Found"
+                    )
                     step.set_response("Failed to query.")
 
             assert "404 Not Found" in str(exc_info.value)

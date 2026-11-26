@@ -126,7 +126,9 @@ class TurnContext:
         """Set the assistant reasoning or completion content."""
         self.snapshot.response = response
 
-    def set_telemetry(self, prompt_tokens: int, completion_tokens: int, cost_usd: float = 0.0) -> None:
+    def set_telemetry(
+        self, prompt_tokens: int, completion_tokens: int, cost_usd: float = 0.0
+    ) -> None:
         """Record token usage metrics."""
         self.snapshot.telemetry = TokenTelemetry(
             prompt_tokens=prompt_tokens,
@@ -254,7 +256,9 @@ class UnloopSession:
             elif self.raise_on_breakpoint:
                 raise BreakpointHalt(turn.breakpoint_reason or "Unknown breakpoint", turn)
 
-    def check_side_effect(self, rec: ToolInvocationRecord, turn: TurnSnapshot | None = None) -> None:
+    def check_side_effect(
+        self, rec: ToolInvocationRecord, turn: TurnSnapshot | None = None
+    ) -> None:
         """Enforce the replay fence against abandoned or duplicate egress side effects."""
         if not rec.is_side_effect:
             return
@@ -358,7 +362,9 @@ def trace(
     def decorator(func: Callable) -> Callable:
         sig = inspect.signature(func)
 
-        def _extract_prompt_state(args: tuple, kwargs: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
+        def _extract_prompt_state(
+            args: tuple, kwargs: dict[str, Any]
+        ) -> tuple[str | None, dict[str, Any]]:
             try:
                 bound = sig.bind_partial(*args, **kwargs)
                 bound.apply_defaults()
@@ -399,7 +405,9 @@ def trace(
                             elif res is not None:
                                 ctx.set_response(str(res))
                                 ctx.snapshot.metadata["return_value"] = (
-                                    res if isinstance(res, (dict, list, int, float, bool)) else str(res)
+                                    res
+                                    if isinstance(res, (dict, list, int, float, bool))
+                                    else str(res)
                                 )
                             ctx.snapshot.metadata["duration_ms"] = dur
                             ctx.snapshot.metadata["traced_func"] = func.__name__
@@ -437,7 +445,9 @@ def trace(
                             elif res is not None:
                                 ctx.set_response(str(res))
                                 ctx.snapshot.metadata["return_value"] = (
-                                    res if isinstance(res, (dict, list, int, float, bool)) else str(res)
+                                    res
+                                    if isinstance(res, (dict, list, int, float, bool))
+                                    else str(res)
                                 )
                             ctx.snapshot.metadata["duration_ms"] = dur
                             ctx.snapshot.metadata["traced_func"] = func.__name__

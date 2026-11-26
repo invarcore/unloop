@@ -112,7 +112,9 @@ class UnloopTuiApp(App):
     def on_mount(self) -> None:
         self.title = f"unloop: {self.db_path.name}"
         cursor = self.store.conn.cursor()
-        row = cursor.execute("SELECT session_id, active_branch FROM sessions ORDER BY created_at DESC LIMIT 1").fetchone()
+        row = cursor.execute(
+            "SELECT session_id, active_branch FROM sessions ORDER BY created_at DESC LIMIT 1"
+        ).fetchone()
         if row:
             self.active_session_id = row[0]
             self.active_branch = row[1] or "main"
@@ -156,7 +158,9 @@ class UnloopTuiApp(App):
             self.notify("No turn selected to fork from.", severity="warning")
             return
 
-        new_branch_name = f"fork_turn_{self.selected_turn.turn_index}_{self.selected_turn.turn_id[:4]}"
+        new_branch_name = (
+            f"fork_turn_{self.selected_turn.turn_index}_{self.selected_turn.turn_id[:4]}"
+        )
         try:
             self.store.fork_branch(
                 session_id=self.active_session_id,
@@ -180,7 +184,9 @@ class UnloopTuiApp(App):
         mutated_state["_mutated_in_tui"] = True
         self.selected_turn.state = mutated_state
         self.store.save_turn(self.selected_turn, allow_update=True)
-        self.notify(f"Mutated state on turn #{self.selected_turn.turn_index}.", severity="information")
+        self.notify(
+            f"Mutated state on turn #{self.selected_turn.turn_index}.", severity="information"
+        )
         self._update_views(self.selected_turn)
 
     def _update_views(self, turn: TurnSnapshot) -> None:
@@ -224,9 +230,13 @@ class UnloopTuiApp(App):
         diff_text.append("\n[bold white]Current Memory State:[/bold white]")
         diff_text.append(json.dumps(turn.state, indent=2))
 
-        if turn.telemetry and (turn.telemetry.total_tokens > 0 or turn.telemetry.estimated_cost_usd > 0):
+        if turn.telemetry and (
+            turn.telemetry.total_tokens > 0 or turn.telemetry.estimated_cost_usd > 0
+        ):
             diff_text.append("\n[bold cyan]Telemetry:[/bold cyan]")
-            diff_text.append(f"Tokens: {turn.telemetry.total_tokens} (P: {turn.telemetry.prompt_tokens}, C: {turn.telemetry.completion_tokens})")
+            diff_text.append(
+                f"Tokens: {turn.telemetry.total_tokens} (P: {turn.telemetry.prompt_tokens}, C: {turn.telemetry.completion_tokens})"
+            )
             if turn.telemetry.estimated_cost_usd > 0:
                 diff_text.append(f"Cost: ${turn.telemetry.estimated_cost_usd:.4f}")
 

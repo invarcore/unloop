@@ -49,11 +49,11 @@ def run_agent_demonstration() -> None:
         # Step 2-4: Agent enters a repetitive critique death loop
         loop_tripped_at = None
         for i in range(3):
-            with dbg.step(prompt=f"Search attempt {i+1}", state=memory) as step:
+            with dbg.step(prompt=f"Search attempt {i + 1}", state=memory) as step:
                 # Tool invocation with identical argument
                 res = mock_tool_call("web_search", memory["query"])
                 step.record_tool("web_search", arguments={"query": memory["query"]}, result=res)
-                step.set_response(f"Attempt {i+1} failed; retrying with same query.")
+                step.set_response(f"Attempt {i + 1} failed; retrying with same query.")
                 memory["iterations"] += 1
 
                 if step.snapshot.is_breakpoint:

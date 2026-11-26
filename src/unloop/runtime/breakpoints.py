@@ -91,7 +91,10 @@ class BreakpointManager:
                     return True, f"[{bp.id}] Turn execution error encountered: {turn_err}"
                 for tool in turn.tool_invocations:
                     if tool.error is not None:
-                        return True, f"[{bp.id}] Tool error encountered in '{tool.tool_name}': {tool.error}"
+                        return (
+                            True,
+                            f"[{bp.id}] Tool error encountered in '{tool.tool_name}': {tool.error}",
+                        )
 
             # 5. Custom state condition trigger
             if bp.condition:

@@ -82,12 +82,14 @@ Wrap agent turn functions directly (supports both sync and async):
 ```python
 import unloop
 
+
 # Automatically records prompt, memory deltas, durations, and returned reasoning
 @unloop.trace()
 def run_agent_turn(prompt: str, state: dict) -> str:
     response = call_llm(prompt, state)
     state["last_thought"] = response
     return response
+
 
 # Or asynchronously:
 @unloop.trace()

@@ -16,11 +16,15 @@ def test_tui_navigation_and_interactions() -> None:
             db_path = Path(tmpdir) / "tui_test.unloop"
 
             with unloop.session("tui_session", db_path=db_path) as dbg:
-                with dbg.step(prompt="First Step", state={"status": "initial", "counter": 0}) as step:
+                with dbg.step(
+                    prompt="First Step", state={"status": "initial", "counter": 0}
+                ) as step:
                     step.record_tool("init", arguments={}, result="OK")
                     step.set_response("Initialized")
 
-                with dbg.step(prompt="Second Step", state={"status": "active", "counter": 1}) as step:
+                with dbg.step(
+                    prompt="Second Step", state={"status": "active", "counter": 1}
+                ) as step:
                     step.record_tool("compute", arguments={"x": 10}, result=20)
                     step.set_response("Computed result")
 

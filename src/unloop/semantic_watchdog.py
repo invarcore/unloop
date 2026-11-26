@@ -21,7 +21,7 @@ _VOLATILE_NOISE_RE = re.compile(
     r"(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})|"  # UUID
     r"(?:\b0x[0-9a-fA-F]+\b)|"  # Hex pointers
     r"(?:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)|"  # ISO timestamp
-    r"(?:(?:timestamp|time|duration|ms|latency)[\"']?\s*[:=]\s*[\"']?[0-9.]+(?:ms|s|ns)?[\"']?)", # runtime numbers
+    r"(?:(?:timestamp|time|duration|ms|latency)[\"']?\s*[:=]\s*[\"']?[0-9.]+(?:ms|s|ns)?[\"']?)",  # runtime numbers
     re.IGNORECASE,
 )
 
@@ -52,10 +52,7 @@ def _scrub_object(obj: Any) -> Any:
         scrubbed = _VOLATILE_NOISE_RE.sub("<SCRUBBED>", obj)
         return unicodedata.normalize("NFC", scrubbed)
     elif isinstance(obj, dict):
-        return {
-            unicodedata.normalize("NFC", str(k)): _scrub_object(v)
-            for k, v in obj.items()
-        }
+        return {unicodedata.normalize("NFC", str(k)): _scrub_object(v) for k, v in obj.items()}
     elif isinstance(obj, list):
         return [_scrub_object(x) for x in obj]
     return obj
@@ -138,7 +135,9 @@ class SemanticOscillationWatchdog:
             OscillationDetectedError: If consecutive STALE_REF strikes, identical
                 repeats (A->A), or 2-cycle alternating loops (A->B->A->B) occur.
         """
-        content_str = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
+        content_str = (
+            content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
+        )
         content_norm = unicodedata.normalize("NFC", content_str)
 
         # 1. First-class STALE_REF / TOCTOU drift detection (Guardrail 4)
@@ -189,4 +188,3 @@ class SemanticOscillationWatchdog:
 
         self._digests.append(digest)
         return digest
-

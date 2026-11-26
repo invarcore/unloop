@@ -433,20 +433,24 @@ def test_run_stdio_proxy_session_bidirectional_and_blocking(tmp_path: Path) -> N
     )
 
     # 1. First line: valid tool call
-    valid_call = json.dumps({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "tools/call",
-        "params": {"name": "test", "arguments": {"notes": "valid"}},
-    })
+    valid_call = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {"name": "test", "arguments": {"notes": "valid"}},
+        }
+    )
 
     # 2. Second line: malicious flag injection
-    malicious_call = json.dumps({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "method": "tools/call",
-        "params": {"name": "test", "arguments": {"ref": "--upload-pack=cat /etc/passwd"}},
-    })
+    malicious_call = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {"name": "test", "arguments": {"ref": "--upload-pack=cat /etc/passwd"}},
+        }
+    )
 
     client_in = io.StringIO(f"{valid_call}\n{malicious_call}\n")
     client_out = io.StringIO()
@@ -514,11 +518,14 @@ def test_sanitize_tool_arguments_edge_cases(tmp_path: Path) -> None:
     assert sanitized["items"][1]["count"] == 42
 
 
-def test_verify_path_in_jail_cross_drive_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_verify_path_in_jail_cross_drive_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     jail = tmp_path / "jail"
     jail.mkdir()
 
     import os
+
     def fake_commonpath(paths):
         raise ValueError("Paths don't have the same drive")
 
@@ -653,43 +660,47 @@ def test_stdio_recorder_dynamically_learns_tool_schema(tmp_path: Path) -> None:
     recorder = StdioSessionRecorder(db_path=db_file, session_id="learn_sess", jail_dir=jail)
 
     # 1. Server responds to tools/list with custom tool schema
-    tools_list_response = json.dumps({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "result": {
-            "tools": [
-                {
-                    "name": "backup_repo",
-                    "inputSchema": {
-                        "type": "object",
-                        "properties": {
-                            "backup_dest": {
-                                "type": "string",
-                                "description": "The filesystem path for backup output",
-                            }
+    tools_list_response = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+                "tools": [
+                    {
+                        "name": "backup_repo",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "backup_dest": {
+                                    "type": "string",
+                                    "description": "The filesystem path for backup output",
+                                }
+                            },
                         },
-                    },
-                }
-            ]
-        },
-    })
+                    }
+                ]
+            },
+        }
+    )
     recorder.intercept_server_line(tools_list_response)
 
     # Verify that the policy on recorder now contains backup_dest!
     assert "backup_dest" in recorder.argshield_policy.strict_path_keys
 
     # 2. Next client request invokes backup_repo with path traversal in backup_dest
-    client_call = json.dumps({
-        "jsonrpc": "2.0",
-        "id": 2,
-        "method": "tools/call",
-        "params": {
-            "name": "backup_repo",
-            "arguments": {
-                "backup_dest": "../../../etc/shadow",
+    client_call = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+                "name": "backup_repo",
+                "arguments": {
+                    "backup_dest": "../../../etc/shadow",
+                },
             },
-        },
-    })
+        }
+    )
     _forward, err_str = recorder.intercept_client_line(client_call)
     assert err_str is not None
     err = json.loads(err_str)
@@ -698,5 +709,3 @@ def test_stdio_recorder_dynamically_learns_tool_schema(tmp_path: Path) -> None:
     assert err["error"]["data"]["violation"] == "path_traversal"
 
     recorder.close()
-
-

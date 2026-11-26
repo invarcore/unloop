@@ -23,25 +23,29 @@ BANNED_FLAG_PREFIXES: tuple[str, ...] = (
     "--git-dir=",
 )
 
-STRICT_PATH_KEYS: frozenset[str] = frozenset({
-    "path",
-    "filepath",
-    "filename",
-    "dir",
-    "directory",
-    "cwd",
-    "worktree",
-    "repo_path",
-})
+STRICT_PATH_KEYS: frozenset[str] = frozenset(
+    {
+        "path",
+        "filepath",
+        "filename",
+        "dir",
+        "directory",
+        "cwd",
+        "worktree",
+        "repo_path",
+    }
+)
 
-POSITIONAL_FLAG_PARAMS: frozenset[str] = frozenset({
-    "ref",
-    "object",
-    "revision",
-    "branch",
-    "tag",
-    "commit",
-})
+POSITIONAL_FLAG_PARAMS: frozenset[str] = frozenset(
+    {
+        "ref",
+        "object",
+        "revision",
+        "branch",
+        "tag",
+        "commit",
+    }
+)
 
 WIN_DEVICE_NAMES: frozenset[str] = frozenset(
     {"CON", "PRN", "AUX", "NUL"}
@@ -88,13 +92,21 @@ class ArgShieldPolicy:
                         prop_fmt = prop_meta.get("format", "").lower()
                         desc = prop_meta.get("description", "").lower()
                         if prop_fmt in ("path", "uri", "filepath") or any(
-                            kw in desc for kw in ("file path", "directory path", "filesystem path", "relative path")
+                            kw in desc
+                            for kw in (
+                                "file path",
+                                "directory path",
+                                "filesystem path",
+                                "relative path",
+                            )
                         ):
                             inferred_keys.add(prop_name.lower())
         return cls(
             jail_dir=jail_dir or (base_policy.jail_dir if base_policy else None),
             strict_path_keys=frozenset(inferred_keys),
-            banned_flag_prefixes=base_policy.banned_flag_prefixes if base_policy else BANNED_FLAG_PREFIXES,
+            banned_flag_prefixes=base_policy.banned_flag_prefixes
+            if base_policy
+            else BANNED_FLAG_PREFIXES,
             positional_flag_param_names=(
                 base_policy.positional_flag_param_names if base_policy else POSITIONAL_FLAG_PARAMS
             ),

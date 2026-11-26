@@ -26,7 +26,9 @@ def test_storage_crud_and_branching() -> None:
                 prompt="Initial query",
                 response="I will search",
                 state={"step": 0},
-                tool_invocations=[ToolInvocationRecord(tool_name="search", arguments={"q": "test"})],
+                tool_invocations=[
+                    ToolInvocationRecord(tool_name="search", arguments={"q": "test"})
+                ],
             )
             store.save_turn(turn0)
 
@@ -115,7 +117,9 @@ def test_storage_encryption_and_redaction() -> None:
 
             # Check raw SQLite row is encrypted and redacted
             cursor = store.conn.cursor()
-            raw_row = cursor.execute("SELECT prompt, state_json FROM turns WHERE turn_id = ?", (turn.turn_id,)).fetchone()
+            raw_row = cursor.execute(
+                "SELECT prompt, state_json FROM turns WHERE turn_id = ?", (turn.turn_id,)
+            ).fetchone()
             raw_prompt = raw_row[0]
             raw_state = raw_row[1]
 

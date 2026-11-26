@@ -9,6 +9,7 @@ Grounded in INV-WP-2026-05 (Partitioned Invariant Compaction).
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import math
 import posixpath
@@ -110,14 +111,29 @@ def canonicalize_constraints_rfc8785(clauses: Sequence[str], anchors: set[str]) 
 
 
 def verify_compaction_checkpoint(
-    pre_compaction_text: str,
-    post_compaction_text: str,
+    checkpoint_or_pre: Mapping[str, Any] | str,
+    post_compaction_text: str | None = None,
     require_all_slots: bool = True,
-) -> SlotVerificationReport:
+    *,
+    signing_key: str | bytes | None = None,
+    require_arcbench_lock: bool = True,
+) -> bool | SlotVerificationReport:
     """Deterministically verify that a 6-slot OpenClaw/Hermes compaction summary preserves constraints.
 
-    Preserves all hard negative constraints and technical anchors (<2ms runtime).
+    When passed a checkpoint Mapping, verifies the arcbench_lock HMAC sidecar.
+    When passed pre/post text strings, preserves all hard negative constraints and technical anchors.
     """
+    if isinstance(checkpoint_or_pre, Mapping):
+        return _verify_checkpoint_dict(
+            checkpoint_or_pre,
+            signing_key=signing_key,
+            require_arcbench_lock=require_arcbench_lock,
+        )
+
+    if post_compaction_text is None:
+        raise ValueError("post_compaction_text must be provided for string prompt verification")
+
+    pre_compaction_text = checkpoint_or_pre
     post_slots = parse_compaction_slots(post_compaction_text)
     missing_slots = (
         tuple(s for s in CANONICAL_SLOTS if s not in post_slots) if require_all_slots else ()
@@ -162,6 +178,85 @@ def verify_compaction_checkpoint(
         canonical_constraints_digest=digest,
         slot_map=post_slots,
     )
+
+
+def _verify_checkpoint_dict(
+    checkpoint: Mapping[str, Any],
+    *,
+    signing_key: str | bytes | None,
+    require_arcbench_lock: bool,
+) -> bool:
+    arcbench_lock = checkpoint.get("arcbench_lock")
+    if arcbench_lock is None:
+        if require_arcbench_lock:
+            raise ValueError("Compaction checkpoint missing required arcbench_lock sidecar")
+        return True
+
+    if not isinstance(arcbench_lock, Mapping):
+        raise ValueError("arcbench_lock sidecar must be a dictionary")
+
+    if signing_key is None:
+        raise ValueError("signing_key is required for verifying arcbench_lock")
+    if isinstance(signing_key, str):
+        key_bytes = signing_key.encode("utf-8")
+    elif isinstance(signing_key, bytes):
+        key_bytes = signing_key
+    else:
+        raise ValueError("signing_key must be str or bytes")
+
+    if len(key_bytes.strip()) < 32:
+        raise ValueError("signing_key must be at least 32 non-whitespace bytes")
+
+    lock_digest = arcbench_lock.get("lock_digest")
+    if not isinstance(lock_digest, str):
+        raise ValueError("Missing lock_digest in arcbench_lock")
+
+    if not lock_digest.startswith("@arcbench_lock:hmac-sha256:"):
+        raise ValueError(f"Unsupported lock_digest scheme: {lock_digest}")
+
+    expected_mac = lock_digest.split(":")[-1]
+
+    raw_pinned = arcbench_lock.get("pinned_arg_literals") or {}
+    typed_pinned: dict[str, dict[str, dict[str, Any]]] = {}
+    for k, v in sorted(raw_pinned.items(), key=lambda item: str(item[0])):
+        if isinstance(v, Mapping):
+            tool_dict: dict[str, dict[str, Any]] = {}
+            for ak, av in sorted(v.items(), key=lambda item: str(item[0])):
+                if isinstance(av, Mapping) and "type" in av and "value" in av:
+                    tool_dict[str(ak)] = {
+                        "type": str(av["type"]),
+                        "value": list(av["value"])
+                        if isinstance(av["value"], (list, tuple))
+                        else av["value"],
+                    }
+                else:
+                    t_name = "list" if isinstance(av, (list, tuple)) else type(av).__name__
+                    tool_dict[str(ak)] = {
+                        "type": t_name,
+                        "value": list(av) if isinstance(av, (list, tuple)) else av,
+                    }
+            typed_pinned[str(k)] = tool_dict
+
+    allow_any = bool(arcbench_lock.get("allow_any_tool", False))
+    payload = {
+        "schema": "arcbench-compaction-lock-v3",
+        "allow_any_tool": allow_any,
+        "allowed_tools": list(arcbench_lock.get("allowed_tools", ())),
+        "forbidden_tools": list(arcbench_lock.get("forbidden_tools", ())),
+        "forbidden_path_prefixes": list(arcbench_lock.get("forbidden_path_prefixes", ())),
+        "pinned_arg_literals": typed_pinned,
+        "pinned_model_version": arcbench_lock.get("pinned_model_version"),
+    }
+    canon = json.dumps(
+        _normalize_jcs(payload),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    computed_mac = hmac.new(key_bytes, canon, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(computed_mac, expected_mac):
+        raise ValueError("HMAC signature mismatch: arcbench_lock sidecar tampering detected")
+    return True
 
 
 _DRIVE_RE = re.compile(r"^([A-Za-z]:)(/.*)?$")

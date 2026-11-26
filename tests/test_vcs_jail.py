@@ -24,10 +24,17 @@ def git_repo(tmp_path: Path) -> Path:
     repo.mkdir()
     subprocess.run(["git", "init"], cwd=str(repo), check=True, capture_output=True)
     subprocess.run(["git", "config", "user.name", "Agent Tester"], cwd=str(repo), check=True)
-    subprocess.run(["git", "config", "user.email", "agent@invarcore.com"], cwd=str(repo), check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "agent@invarcore.com"], cwd=str(repo), check=True
+    )
     (repo / "base.py").write_text("def base_fn():\n    return 'base'\n", encoding="utf-8")
     subprocess.run(["git", "add", "."], cwd=str(repo), check=True)
-    subprocess.run(["git", "commit", "-m", "Initial base commit"], cwd=str(repo), check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Initial base commit"],
+        cwd=str(repo),
+        check=True,
+        capture_output=True,
+    )
     return repo
 
 
@@ -52,7 +59,9 @@ def test_vcs_jail_lifecycle_and_patch_export(git_repo: Path) -> None:
         coord.create_jail(agent_id)
 
     # Modify base.py and create new file inside jail
-    (jail_path / "base.py").write_text("def base_fn():\n    return 'mutated_by_alpha'\n", encoding="utf-8")
+    (jail_path / "base.py").write_text(
+        "def base_fn():\n    return 'mutated_by_alpha'\n", encoding="utf-8"
+    )
     (jail_path / "untracked.py").write_text("# Untracked addition\n", encoding="utf-8")
 
     patch, digest = coord.export_patch_and_digest(agent_id)

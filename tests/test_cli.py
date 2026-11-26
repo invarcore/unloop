@@ -51,7 +51,9 @@ def test_cli_diff() -> None:
                 step.record_tool("init_system", arguments={})
                 step.set_response("Initialized")
 
-            with dbg.step(prompt="Turn 1", state={"counter": 2, "status": "completed", "extra": "yes"}) as step:
+            with dbg.step(
+                prompt="Turn 1", state={"counter": 2, "status": "completed", "extra": "yes"}
+            ) as step:
                 step.record_tool("execute_task", arguments={"id": 42})
                 step.set_response("Completed")
 
@@ -72,7 +74,9 @@ def test_cli_check_passed() -> None:
                 step.record_tool("ok_tool", arguments={}, result="OK")
                 step.set_response("Clean response")
 
-        res = runner.invoke(cli, ["check", str(db_path), "--max-turns", "5", "--no-errors", "--no-oscillations"])
+        res = runner.invoke(
+            cli, ["check", str(db_path), "--max-turns", "5", "--no-errors", "--no-oscillations"]
+        )
         assert res.exit_code == 0
         assert "unloop check PASSED" in res.output
 
@@ -123,11 +127,15 @@ def test_cli_record_subprocess() -> None:
         script_path = Path(tmpdir) / "agent_script.py"
         script_path.write_text(script_code, encoding="utf-8")
 
-        res = runner.invoke(cli, ["record", "-o", str(session_out), "--", sys.executable, str(script_path)])
+        res = runner.invoke(
+            cli, ["record", "-o", str(session_out), "--", sys.executable, str(script_path)]
+        )
         assert res.exit_code == 0
         assert session_out.exists()
         assert "unloop record finished" in res.output
 
         with unloop.UnloopStore(session_out) as store:
-            sess = store.get_session("subprocess_agent") or store.get_history(store.conn.execute("SELECT session_id FROM sessions").fetchone()[0])
+            sess = store.get_session("subprocess_agent") or store.get_history(
+                store.conn.execute("SELECT session_id FROM sessions").fetchone()[0]
+            )
             assert len(sess) > 0

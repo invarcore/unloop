@@ -81,7 +81,9 @@ def info(db_path: str) -> None:
 @cli.command("history")
 @click.argument("db_path", type=click.Path(exists=True, dir_okay=False))
 @click.option("--session-id", default=None, help="Specific session ID to inspect.")
-@click.option("--branch", default=None, help="Branch name to inspect (defaults to session active branch).")
+@click.option(
+    "--branch", default=None, help="Branch name to inspect (defaults to session active branch)."
+)
 def history(db_path: str, session_id: str | None, branch: str | None) -> None:
     """List execution turns with tool calls and state deltas."""
     with UnloopStore(db_path) as store:
@@ -113,7 +115,11 @@ def history(db_path: str, session_id: str | None, branch: str | None) -> None:
         )
 
         for t in turns:
-            bp_tag = f" [bold red][BREAKPOINT] {t.breakpoint_reason}[/bold red]" if t.is_breakpoint else ""
+            bp_tag = (
+                f" [bold red][BREAKPOINT] {t.breakpoint_reason}[/bold red]"
+                if t.is_breakpoint
+                else ""
+            )
             panel_title = f"Turn #{t.turn_index} (ID: {t.turn_id[:8]}){bp_tag}"
 
             content: list[str] = []
@@ -126,12 +132,16 @@ def history(db_path: str, session_id: str | None, branch: str | None) -> None:
                 content.append("\n[bold yellow]Tool Invocations:[/bold yellow]")
                 for tool in t.tool_invocations:
                     status = "[red]FAILED[/red]" if tool.error else "[green]OK[/green]"
-                    content.append(f"  * {tool.tool_name} {status} (args: {json.dumps(tool.arguments)})")
+                    content.append(
+                        f"  * {tool.tool_name} {status} (args: {json.dumps(tool.arguments)})"
+                    )
                     if tool.error:
                         content.append(f"    [red]Error: {tool.error}[/red]")
 
             if t.state_delta and any(t.state_delta.values()):
-                content.append(f"\n[bold magenta]State Delta:[/bold magenta] {json.dumps(t.state_delta)}")
+                content.append(
+                    f"\n[bold magenta]State Delta:[/bold magenta] {json.dumps(t.state_delta)}"
+                )
 
             border = "red" if t.is_breakpoint else "blue"
             console.print(Panel("\n".join(content), title=panel_title, border_style=border))
@@ -142,7 +152,13 @@ def history(db_path: str, session_id: str | None, branch: str | None) -> None:
 @click.option("--from", "turn_a_idx", type=int, default=0, help="First turn index to compare.")
 @click.option("--to", "turn_b_idx", type=int, default=1, help="Second turn index to compare.")
 @click.option("--branch", default=None, help="Branch name (defaults to active branch).")
-@click.option("--prompt", "-p", is_flag=True, default=False, help="Display detailed prompt diff and compaction analysis.")
+@click.option(
+    "--prompt",
+    "-p",
+    is_flag=True,
+    default=False,
+    help="Display detailed prompt diff and compaction analysis.",
+)
 @click.option(
     "--verify-slots",
     is_flag=True,
@@ -314,7 +330,9 @@ def record(output: str, command: tuple[str, ...]) -> None:
     env["UNLOOP_SESSION_FILE"] = str(Path(output).resolve())
     env["UNLOOP_AUTO_RECORD"] = "1"
 
-    console.print(f"[bold cyan]unloop record:[/bold cyan] Running command: [bold green]{' '.join(cmd_list)}[/bold green]")
+    console.print(
+        f"[bold cyan]unloop record:[/bold cyan] Running command: [bold green]{' '.join(cmd_list)}[/bold green]"
+    )
     console.print(f"[dim]Output session file: {output}[/dim]\n")
 
     result = subprocess.run(cmd_list, env=env)
@@ -339,7 +357,9 @@ def record(output: str, command: tuple[str, ...]) -> None:
                     "recording_mode": "subprocess_wrapper",
                 },
                 is_breakpoint=result.returncode != 0,
-                breakpoint_reason=f"Subprocess non-zero exit code: {result.returncode}" if result.returncode != 0 else None,
+                breakpoint_reason=f"Subprocess non-zero exit code: {result.returncode}"
+                if result.returncode != 0
+                else None,
             )
             store.save_turn(t0)
 
@@ -347,7 +367,9 @@ def record(output: str, command: tuple[str, ...]) -> None:
         with UnloopStore(output) as store:
             cursor = store.conn.cursor()
             turn_count = cursor.execute("SELECT COUNT(*) FROM turns").fetchone()[0]
-            bp_count = cursor.execute("SELECT COUNT(*) FROM turns WHERE is_breakpoint = 1").fetchone()[0]
+            bp_count = cursor.execute(
+                "SELECT COUNT(*) FROM turns WHERE is_breakpoint = 1"
+            ).fetchone()[0]
             console.print(
                 f"\n[bold green]unloop record finished:[/bold green] Recorded {turn_count} turns ({bp_count} breakpoints tripped) in '{output}'."
             )
@@ -358,10 +380,23 @@ def record(output: str, command: tuple[str, ...]) -> None:
 @cli.command("check")
 @click.argument("db_path", type=click.Path(exists=True, dir_okay=False))
 @click.option("--max-turns", type=int, default=None, help="Maximum allowable turns before failure.")
-@click.option("--no-oscillations", is_flag=True, default=False, help="Fail if any loop or oscillation occurred.")
-@click.option("--no-errors", is_flag=True, default=False, help="Fail if any tool execution resulted in an error.")
 @click.option(
-    "--fail-on-breakpoint", is_flag=True, default=False, help="Fail if any execution breakpoint was triggered."
+    "--no-oscillations",
+    is_flag=True,
+    default=False,
+    help="Fail if any loop or oscillation occurred.",
+)
+@click.option(
+    "--no-errors",
+    is_flag=True,
+    default=False,
+    help="Fail if any tool execution resulted in an error.",
+)
+@click.option(
+    "--fail-on-breakpoint",
+    is_flag=True,
+    default=False,
+    help="Fail if any execution breakpoint was triggered.",
 )
 def check_ci(
     db_path: str,
@@ -399,12 +434,21 @@ def check_ci(
                 if t.is_breakpoint
                 and any(
                     kw in (t.breakpoint_reason or "").lower()
-                    for kw in ("watchdog", "oscillation", "loop", "ping-pong", "repetitive", "state_cycle")
+                    for kw in (
+                        "watchdog",
+                        "oscillation",
+                        "loop",
+                        "ping-pong",
+                        "repetitive",
+                        "state_cycle",
+                    )
                 )
             ]
             if oscillation_turns:
                 for ot in oscillation_turns:
-                    violations.append(f"Turn #{ot.turn_index}: Oscillation detected ({ot.breakpoint_reason})")
+                    violations.append(
+                        f"Turn #{ot.turn_index}: Oscillation detected ({ot.breakpoint_reason})"
+                    )
 
         # 3. Check tool & turn errors
         if no_errors:
@@ -428,7 +472,9 @@ def check_ci(
                     )
 
     if violations:
-        console.print(f"[bold red]unloop check FAILED ({len(violations)} violations in '{name}'):[/bold red]")
+        console.print(
+            f"[bold red]unloop check FAILED ({len(violations)} violations in '{name}'):[/bold red]"
+        )
         for v in violations:
             console.print(f"  [red]x[/red] {v}")
         sys.exit(1)
@@ -442,7 +488,9 @@ def check_ci(
 @cli.command("export")
 @click.argument("db_path", type=click.Path(exists=True, dir_okay=False))
 @click.option("--session-id", default=None, help="Specific session ID to export.")
-@click.option("--output", "-o", type=click.Path(), default="incident_report.md", help="Output file path.")
+@click.option(
+    "--output", "-o", type=click.Path(), default="incident_report.md", help="Output file path."
+)
 def export_report(db_path: str, session_id: str | None, output: str) -> None:
     """Export an unloop session into a comprehensive Markdown post-mortem incident report."""
     with UnloopStore(db_path) as store:
@@ -488,7 +536,9 @@ def export_report(db_path: str, session_id: str | None, output: str) -> None:
             if t.tool_invocations:
                 md.append("**Tools Executed**:")
                 for tool in t.tool_invocations:
-                    md.append(f"- `{tool.tool_name}`: `{json.dumps(tool.arguments)}` -> `{tool.result or tool.error}`")
+                    md.append(
+                        f"- `{tool.tool_name}`: `{json.dumps(tool.arguments)}` -> `{tool.result or tool.error}`"
+                    )
             if t.state:
                 md.append(f"**State Snapshot**: `{json.dumps(t.state)}`")
             md.append("")
@@ -510,19 +560,25 @@ def replay(db_path: str) -> None:
 @click.option("--agent-id", required=True, help="Unique identifier for the agent jail.")
 @click.option("--repo", default=".", help="Target Git repository root.")
 @click.option("--base-ref", default="HEAD", help="Base Git revision to detach from.")
-@click.option("--keep", is_flag=True, help="Keep the worktree jail on exit rather than destroying it.")
+@click.option(
+    "--keep", is_flag=True, help="Keep the worktree jail on exit rather than destroying it."
+)
 @click.argument("command", nargs=-1, type=click.UNPROCESSED)
 def jail_cmd(agent_id: str, repo: str, base_ref: str, keep: bool, command: tuple[str, ...]) -> None:
     """Execute commands in an isolated Copy-on-Write git worktree jail."""
     if not command and not keep:
-        console.print("[red]Error: unloop jail requires either a command to execute or the --keep flag.[/red]")
+        console.print(
+            "[red]Error: unloop jail requires either a command to execute or the --keep flag.[/red]"
+        )
         sys.exit(1)
 
     from unloop.vcs_jail import VCSJailCoordinator
 
     coordinator = VCSJailCoordinator(repo_dir=repo)
     jail_path = coordinator.create_jail(agent_id, base_ref=base_ref)
-    console.print(f"[bold green]VCS Jail created for agent '{agent_id}' at[/bold green] {jail_path}")
+    console.print(
+        f"[bold green]VCS Jail created for agent '{agent_id}' at[/bold green] {jail_path}"
+    )
 
     try:
         if command:
@@ -533,11 +589,12 @@ def jail_cmd(agent_id: str, repo: str, base_ref: str, keep: bool, command: tuple
                 sys.stderr.write(res.stderr)
             patch, digest = coordinator.export_patch_and_digest(agent_id)
             if patch:
-                console.print(f"\n[cyan]Captured Unified Diff Digest[/cyan]: [bold]{digest[:16]}[/bold]")
+                console.print(
+                    f"\n[cyan]Captured Unified Diff Digest[/cyan]: [bold]{digest[:16]}[/bold]"
+                )
             if res.returncode != 0:
                 sys.exit(res.returncode)
     finally:
         if not keep:
             coordinator.destroy_jail(agent_id)
             console.print(f"[dim]VCS Jail for '{agent_id}' destroyed.[/dim]")
-

@@ -71,9 +71,13 @@ def test_turn_snapshot_side_effect_invocations_property() -> None:
         turn_index=0,
         tool_invocations=[
             ToolInvocationRecord(tool_name="read_file", arguments={}, is_side_effect=False),
-            ToolInvocationRecord(tool_name="write_file", arguments={"path": "a.txt"}, is_side_effect=True),
+            ToolInvocationRecord(
+                tool_name="write_file", arguments={"path": "a.txt"}, is_side_effect=True
+            ),
             ToolInvocationRecord(tool_name="search", arguments={}, is_side_effect=False),
-            ToolInvocationRecord(tool_name="send_email", arguments={"to": "a@b.com"}, is_side_effect=True),
+            ToolInvocationRecord(
+                tool_name="send_email", arguments={"to": "a@b.com"}, is_side_effect=True
+            ),
         ],
     )
     side_effects = snap.side_effect_invocations
@@ -95,7 +99,9 @@ def test_replay_fence_policy_warn() -> None:
 
             # Turn 1: execute side-effect in real world
             with dbg.step(prompt="Dispatch webhook") as s1:
-                rec1 = s1.record_tool("post_webhook", arguments={"url": "https://api.com/deploy"}, result={"ok": True})
+                rec1 = s1.record_tool(
+                    "post_webhook", arguments={"url": "https://api.com/deploy"}, result={"ok": True}
+                )
                 assert rec1.is_side_effect is True
                 assert "fenced_replay" not in rec1.metadata
 
@@ -110,14 +116,20 @@ def test_replay_fence_policy_warn() -> None:
 
             # Check is_fenced helper before execution
             with dbg.step(prompt="Forked turn") as s_fork:
-                is_fenced, cached = s_fork.is_fenced("post_webhook", arguments={"url": "https://api.com/deploy"})
+                is_fenced, cached = s_fork.is_fenced(
+                    "post_webhook", arguments={"url": "https://api.com/deploy"}
+                )
                 assert is_fenced is True
                 assert cached is not None
 
                 # Replay side-effect tool under "warn" policy
-                rec_replayed = s_fork.record_tool("post_webhook", arguments={"url": "https://api.com/deploy"}, result={"ok": True})
+                rec_replayed = s_fork.record_tool(
+                    "post_webhook", arguments={"url": "https://api.com/deploy"}, result={"ok": True}
+                )
                 assert rec_replayed.metadata.get("fenced_replay") is True
-                assert "Duplicate side effect" in rec_replayed.metadata.get("replay_fence_warning", "")
+                assert "Duplicate side effect" in rec_replayed.metadata.get(
+                    "replay_fence_warning", ""
+                )
 
 
 def test_replay_fence_policy_stub() -> None:
@@ -179,7 +191,9 @@ def test_replay_fence_policy_halt() -> None:
             # Replaying side effect on forked branch under "halt" policy should raise BreakpointHalt
             with pytest.raises(BreakpointHalt) as exc_info:
                 with dbg.step(prompt="Attempt re-sending email") as s_halt:
-                    s_halt.record_tool("send_email", arguments={"to": "admin@example.com", "msg": "ALERT"})
+                    s_halt.record_tool(
+                        "send_email", arguments={"to": "admin@example.com", "msg": "ALERT"}
+                    )
 
             assert "Replay Fence tripped" in str(exc_info.value)
             assert "send_email" in str(exc_info.value)
@@ -207,4 +221,6 @@ def test_replay_fence_policy_switch_on_rewind() -> None:
             # Replay should now raise BreakpointHalt
             with pytest.raises(BreakpointHalt):
                 with dbg.step(prompt="Replay write") as s_strict:
-                    s_strict.record_tool("write_file", arguments={"file": "output.txt", "data": "123"})
+                    s_strict.record_tool(
+                        "write_file", arguments={"file": "output.txt", "data": "123"}
+                    )
