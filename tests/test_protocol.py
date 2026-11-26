@@ -29,8 +29,8 @@ def test_turn_snapshot_state_delta() -> None:
 
 
 def test_session_metadata() -> None:
-    meta = SessionMetadata(name="eval_run", framework="langgraph", model_name="claude-3-7-sonnet")
+    meta = SessionMetadata(name="eval_run", framework="langgraph", model_name="claude-sonnet-4-6")
     assert meta.name == "eval_run"
     assert meta.framework == "langgraph"
-    assert meta.model_name == "claude-3-7-sonnet"
+    assert meta.model_name == "claude-sonnet-4-6"
     assert meta.active_branch == "main"

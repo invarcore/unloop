@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/invarcore/unloop/actions"><img src="https://github.com/invarcore/unloop/actions/workflows/ci.yml/badge.svg" alt="CI Status"></a>
   <a href="https://invarcore.com"><img src="https://img.shields.io/badge/Website-invarcore.com-0284C7?logo=googlechrome&logoColor=white" alt="Invarcore Website"></a>
-  <a href="https://pypi.org/project/unloop/"><img src="https://img.shields.io/badge/PyPI-v0.1.0-blue.svg" alt="PyPI Version"></a>
+  <a href="https://github.com/invarcore/unloop"><img src="https://img.shields.io/badge/Status-Pre--release%20%2F%20Source%20Install-orange.svg" alt="Status"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-3776AB.svg?logo=python&logoColor=white" alt="Python Versions"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License"></a>
   <a href="https://github.com/invarcore/unloop"><img src="https://img.shields.io/badge/Storage-SQLite%20WAL%20(%3C2ms)-orange.svg" alt="Storage Overhead"></a>
@@ -221,10 +221,12 @@ Keys: [s] Next Turn | [u] Prev Turn | [f] Fork Branch | [m] Mutate State | [q] Q
 
 ### Installation
 
+> **Note:** PyPI publication for this package is pending; `unloop` on PyPI belongs to an unrelated third party. Install directly from Git:
+
 ```bash
-pip install unloop
+pip install "git+https://github.com/invarcore/unloop.git"
 # or with uv
-uv tool install unloop
+uv tool install "git+https://github.com/invarcore/unloop.git"
 ```
 
 ### CLI Commands
